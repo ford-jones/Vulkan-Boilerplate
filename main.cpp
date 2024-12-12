@@ -24,15 +24,31 @@ int main()
     }
     else
     {
-        SDL_Surface* winSurface = SDL_GetWindowSurface(window);
-        int status = SDL_UpdateWindowSurface(window);             //   Render any changes to the surface to the screen (swap front/back buffers) 
+        bool window_is_open = true;
+        SDL_Surface* win_surface = SDL_GetWindowSurface(window);
 
-        if(status != 0)
+        while(window_is_open)
         {
-            const char *message = SDL_GetError();
+            SDL_Event event;
+            int queue_state = SDL_PollEvent(&event);
 
-            std::cerr << "Error: " << message << std::endl;
-        };
+            if(queue_state > 0)
+            {
+                if(event.type == SDL_QUIT)
+                {
+                    window_is_open = false;
+                    break;
+                }
+
+                int status = SDL_UpdateWindowSurface(window);             //   Render any changes to the surface to the screen (swap front/back buffers) 
+
+                if(status != 0)
+                {
+                    const char *message = SDL_GetError();
+                    std::cerr << "Error: " << message << std::endl;
+                };
+            };
+        }
     };
 
     return 0;
