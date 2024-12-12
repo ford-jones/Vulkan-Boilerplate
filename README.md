@@ -14,7 +14,7 @@ If you don't you will have to download and install it.
 ## Running the project:
 Compile the source like so:
 ```
-    clang -std=c++17 main.cpp -lSDL2 -lstdc++
+clang -std=c++17 main.cpp -lSDL2 -lstdc++
 ```
 
 Run the project with:
