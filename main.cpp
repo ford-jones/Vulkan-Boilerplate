@@ -1,14 +1,22 @@
 #include <iostream>
-// #include <vulkan>
+
+#include <vulkan/vulkan.h>
+
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_main.h>
 #include <SDL2/SDL_vulkan.h>
-#include <vulkan/vulkan.h>
+
+template<typename T>
+inline T* array_alloc(size_t n) {
+    void* ptr = malloc(n * sizeof(T));
+    memset(ptr, 0x00, n * sizeof(T));
+    return (T*) ptr;
+}
 
 int main()
 {
-    VkResult vk_result = VK_SUCCESS;
+    VkResult vr = VK_SUCCESS;
     /*  This also exists, but initialises a tonne of additional subsytems for things like
         controllers which we don't really need:
 
@@ -22,7 +30,7 @@ int main()
         640, 480,                                               //  Width / height
         SDL_WINDOW_VULKAN                                       //  Flags: May be chained with OR
     );
-    
+
     if(window == NULL)
     {
         std::cerr << "Error: Failed to create window instance. Check availability of Vulkan drivers." << std::endl;
@@ -30,33 +38,46 @@ int main()
     else
     {
         bool window_is_open = true;
-        SDL_Surface* win_surface = SDL_GetWindowSurface(window);
 
         VkInstance vk_instance = {};
         {
-            VkApplicationInfo vk_app_data = {
-                VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                NULL,
-                "Vulkan Demo",
-                0,
-                "Demo Engine",
-                0,
-                VK_API_VERSION_1_0
-            };
+            // our application info (for the driver)
+            VkApplicationInfo app_info = {};
+            app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+            app_info.pApplicationName = "Vulkan Demo";
+            app_info.pEngineName      = "Demo Engine";
+            app_info.apiVersion       = VK_API_VERSION_1_0;
 
-            VkInstanceCreateInfo vk_inst_data = {
-                VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-                NULL,
-                0,
-                &vk_app_data   
-            };
-            vk_result = vkCreateInstance(&vk_inst_data, NULL, &vk_instance);
+            // instance configuratuion
+            VkInstanceCreateInfo instance_info = {};
 
-            if(vk_result != VK_SUCCESS)
+            // basic config
+            instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+            instance_info.pApplicationInfo = &app_info;
+
+            // get extension requirements from SDL
+
+            SDL_Vulkan_GetInstanceExtensions(window, &instance_info.enabledExtensionCount, nullptr);
+            instance_info.ppEnabledExtensionNames = array_alloc<char*>(instance_info.enabledExtensionCount);
+            SDL_Vulkan_GetInstanceExtensions(window, &instance_info.enabledExtensionCount, (const char**) instance_info.ppEnabledExtensionNames);
+
+            std::cout << "Requiring extensions:" << std::endl;
+            for (int i = 0; i < instance_info.enabledExtensionCount; i++) {
+                std::cout << instance_info.ppEnabledExtensionNames[i] << std::endl;
+            }
+
+            vr = vkCreateInstance(&instance_info, NULL, &vk_instance);
+
+            if(vr != VK_SUCCESS)
             {
+                // TODO: better error handling
                 std::cerr << "Failed to initialise Vulkan" << std::endl;
             };
         };
+
+        VkSurfaceKHR vk_surface = {};
+        SDL_Vulkan_CreateSurface(window, vk_instance, &vk_surface);
+        SDL_Surface* win_surface = SDL_GetWindowSurface(window);
 
         while(window_is_open)
         {
