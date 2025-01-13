@@ -1,11 +1,14 @@
 #include <iostream>
-
+// #include <vulkan>
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_main.h>
+#include <SDL2/SDL_vulkan.h>
+#include <vulkan/vulkan.h>
 
 int main()
 {
+    VkResult vk_result = VK_SUCCESS;
     /*  This also exists, but initialises a tonne of additional subsytems for things like
         controllers which we don't really need:
 
@@ -19,7 +22,7 @@ int main()
         640, 480,                                               //  Width / height
         SDL_WINDOW_VULKAN                                       //  Flags: May be chained with OR
     );
-
+    
     if(window == NULL)
     {
         std::cerr << "Error: Failed to create window instance. Check availability of Vulkan drivers." << std::endl;
@@ -28,6 +31,17 @@ int main()
     {
         bool window_is_open = true;
         SDL_Surface* win_surface = SDL_GetWindowSurface(window);
+
+        VkInstance vk_instance = {};
+        {
+            VkInstanceCreateInfo vk_inst_data = {};
+            vk_result = vkCreateInstance(&vk_inst_data, NULL, &vk_instance);
+
+            if(vk_result != VK_SUCCESS)
+            {
+                std::cerr << "Failed to initialise Vulkan" << std::endl;
+            };
+        };
 
         while(window_is_open)
         {
