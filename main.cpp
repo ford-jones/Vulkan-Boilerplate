@@ -47,9 +47,8 @@ int main()
             VkInstanceCreateInfo vk_inst_data = {
                 VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
                 NULL,
-                NULL,
-                &vk_app_data,
-                0    
+                0,
+                &vk_app_data   
             };
             vk_result = vkCreateInstance(&vk_inst_data, NULL, &vk_instance);
 
