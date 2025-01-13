@@ -34,7 +34,23 @@ int main()
 
         VkInstance vk_instance = {};
         {
-            VkInstanceCreateInfo vk_inst_data = {};
+            VkApplicationInfo vk_app_data = {
+                VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                NULL,
+                "Vulkan Demo",
+                0,
+                "Demo Engine",
+                0,
+                VK_API_VERSION_1_0
+            };
+
+            VkInstanceCreateInfo vk_inst_data = {
+                VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                NULL,
+                NULL,
+                &vk_app_data,
+                0    
+            };
             vk_result = vkCreateInstance(&vk_inst_data, NULL, &vk_instance);
 
             if(vk_result != VK_SUCCESS)
@@ -64,7 +80,9 @@ int main()
                     std::cerr << "Error: " << message << std::endl;
                 };
             };
-        }
+        };
+
+        vkDestroyInstance(vk_instance, NULL);
     };
 
     return 0;
