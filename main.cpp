@@ -1,11 +1,13 @@
 #include <iostream>
-#include <SDL2/SDL.h>
 
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_main.h>
 
 int main()
-{   
+{
     /*  This also exists, but initialises a tonne of additional subsytems for things like
-        controllers which we don't really need: 
+        controllers which we don't really need:
 
         SDL_Init(SDL_INIT_EVERYTHING); */
 
@@ -13,7 +15,7 @@ int main()
 
     SDL_Window *window = SDL_CreateWindow(
         "Vulkan Demo",                                          //  Title
-        0, 0,                                                   //  Pos X / Pos Y
+        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,       //  Pos X / Pos Y
         640, 480,                                               //  Width / height
         SDL_WINDOW_VULKAN                                       //  Flags: May be chained with OR
     );
@@ -40,7 +42,7 @@ int main()
                     break;
                 }
 
-                int status = SDL_UpdateWindowSurface(window);             //   Render any changes to the surface to the screen (swap front/back buffers) 
+                int status = SDL_UpdateWindowSurface(window);             //   Render any changes to the surface to the screen (swap front/back buffers)
 
                 if(status != 0)
                 {
