@@ -82,6 +82,7 @@ int main()
         };
 
         vkDestroyInstance(vk_instance, NULL);
+        SDL_DestroyWindow(window);
     };
 
     return 0;
