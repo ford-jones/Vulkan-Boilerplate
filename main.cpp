@@ -96,7 +96,7 @@ int main()
         SDL_Vulkan_CreateSurface(window, vk_instance, &vk_surface);
         SDL_Surface* win_surface = SDL_GetWindowSurface(window);
 
-        VkDevice logical_device = {}; {
+        VkDevice vk_logical_device = {}; {
             // query available hardware
             uint32_t device_count = 0;
             vr = vkEnumeratePhysicalDevices(vk_instance, &device_count, nullptr);
@@ -169,7 +169,7 @@ int main()
             device_info.pQueueCreateInfos = queues.data();
             device_info.queueCreateInfoCount = queues.size();
 
-            vr = vkCreateDevice(devices[0], &device_info, NULL, &logical_device);
+            vr = vkCreateDevice(devices[0], &device_info, NULL, &vk_logical_device);
             CHECK_RESULT(vr);
         };
 
@@ -196,6 +196,8 @@ int main()
             };
         };
 
+        SDL_DestroyWindowSurface(window);
+        vkDestroyDevice(vk_logical_device, NULL);
         vkDestroyInstance(vk_instance, NULL);
         SDL_DestroyWindow(window);
     };
