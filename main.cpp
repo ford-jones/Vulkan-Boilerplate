@@ -1,18 +1,31 @@
 #include <iostream>
 
 #include <vulkan/vulkan.h>
+#include <vector>
 
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_main.h>
 #include <SDL2/SDL_vulkan.h>
 
-template<typename T>
-inline T* array_alloc(size_t n) {
-    void* ptr = malloc(n * sizeof(T));
-    memset(ptr, 0x00, n * sizeof(T));
-    return (T*) ptr;
-}
+#define CHECK_RESULT(VR) if ((VR) != VK_SUCCESS) {printf("%s(%d)\n", __FILE__, __LINE__); std::exit((VR));}
+
+typedef int8_t    i8;
+typedef int16_t   i16;
+typedef int32_t   i32;
+typedef int64_t   i64;
+typedef ptrdiff_t isize;
+typedef intptr_t  iptr;
+
+typedef uint8_t   u8;
+typedef uint16_t  u16;
+typedef uint32_t  u32;
+typedef uint64_t  u64;
+typedef size_t    usize;
+typedef uintptr_t uptr;
+
+typedef float  f32;
+typedef double f64;
 
 int main()
 {
@@ -23,6 +36,9 @@ int main()
         SDL_Init(SDL_INIT_EVERYTHING); */
 
     SDL_InitSubSystem(SDL_INIT_VIDEO);
+
+    int extension_count = 0;
+    const char *extension_names[64];
 
     SDL_Window *window = SDL_CreateWindow(
         "Vulkan Demo",                                          //  Title
@@ -56,28 +72,94 @@ int main()
             instance_info.pApplicationInfo = &app_info;
 
             // get extension requirements from SDL
+            std::vector<char*> extensions;
 
-            SDL_Vulkan_GetInstanceExtensions(window, &instance_info.enabledExtensionCount, nullptr);
-            instance_info.ppEnabledExtensionNames = array_alloc<char*>(instance_info.enabledExtensionCount);
-            SDL_Vulkan_GetInstanceExtensions(window, &instance_info.enabledExtensionCount, (const char**) instance_info.ppEnabledExtensionNames);
+            u32 sdl_n_extensions = 0;
+            SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, nullptr);
+            extensions.resize(sdl_n_extensions);
+            SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, (const char**) extensions.data());
+
+            instance_info.enabledExtensionCount   = extensions.size();
+            instance_info.ppEnabledExtensionNames = extensions.data();
 
             std::cout << "Requiring extensions:" << std::endl;
             for (int i = 0; i < instance_info.enabledExtensionCount; i++) {
                 std::cout << instance_info.ppEnabledExtensionNames[i] << std::endl;
-            }
+                extension_names[extension_count++] = instance_info.ppEnabledExtensionNames[i];
+            };
 
             vr = vkCreateInstance(&instance_info, NULL, &vk_instance);
-
-            if(vr != VK_SUCCESS)
-            {
-                // TODO: better error handling
-                std::cerr << "Failed to initialise Vulkan" << std::endl;
-            };
+            CHECK_RESULT(vr);
         };
 
         VkSurfaceKHR vk_surface = {};
         SDL_Vulkan_CreateSurface(window, vk_instance, &vk_surface);
         SDL_Surface* win_surface = SDL_GetWindowSurface(window);
+
+        VkDevice vk_device = {}; {
+            // query available hardware
+            uint32_t device_count = 0;
+            vr = vkEnumeratePhysicalDevices(vk_instance, &device_count, nullptr);
+            std::cout << "Querying [" << device_count << "] devices:" << std::endl;
+
+            if(device_count < 1)
+            {
+                std::cerr << "No devices found" << std::endl;
+                std::exit(0);
+            };
+
+            std::vector<VkPhysicalDevice> devices;
+            devices.resize(device_count);
+            vr = vkEnumeratePhysicalDevices(vk_instance, &device_count, devices.data());
+            CHECK_RESULT(vr);
+
+            // check hardware capabilities
+            std::vector<VkQueueFamilyProperties> queue_families;
+            for (u32 i = 0; i < device_count; i++) {
+                // log the device name
+                VkPhysicalDeviceProperties properties = {};
+                vkGetPhysicalDeviceProperties(devices[i], &properties);
+                std::cout << std::endl << properties.deviceName << ":" << std::endl;
+
+                // check device queue support
+                u32 n_queue_families = {};
+                vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &n_queue_families, nullptr);
+                if (n_queue_families < 1)
+                {
+                    std::cout << "no queue families" << std::endl;
+                    continue;
+                } else {
+                    std::cout << "[" << n_queue_families << "] supported queue families:" << std::endl;
+                }
+                queue_families.resize(n_queue_families);
+                vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &n_queue_families, queue_families.data());
+
+                for (u32 i = 0; i < n_queue_families; i++) {
+                    VkQueueFamilyProperties family = queue_families[i];
+
+                    // log family index and count
+                    std::cout << "family " << i << ":\tcount:\t" << family.queueCount << "\tflags: | ";
+                    // log queue family flags
+                    std::cout << (family.queueFlags & VK_QUEUE_GRAPHICS_BIT         ? "GRAPHICS | "       : "         | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_COMPUTE_BIT          ? "COMPUTE | "        : "        | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_TRANSFER_BIT         ? "TRANSFER | "       : "         | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT   ? "SPARSE_BINDING | " : "               | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "DECODE | "         : "       | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "ENCODE | "         : "       | ");
+                    std::cout << (family.queueFlags & VK_QUEUE_PROTECTED_BIT        ? "PROTECTED | "      : "          | ");
+                    // log image transfer granularity
+                    std::cout << " transfer granularity: (" << family.minImageTransferGranularity.width << ", " << family.minImageTransferGranularity.height << ", " << family.minImageTransferGranularity.width << ")";
+                    std::cout << std::endl;
+                }
+            }
+
+            // create device interface
+            VkDeviceCreateInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+            vr = vkCreateDevice(devices[0], &info, NULL, &vk_device);
+            CHECK_RESULT(vr);
+        };
 
         while(window_is_open)
         {
