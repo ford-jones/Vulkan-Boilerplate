@@ -96,7 +96,7 @@ int main()
         SDL_Vulkan_CreateSurface(window, vk_instance, &vk_surface);
         SDL_Surface* win_surface = SDL_GetWindowSurface(window);
 
-        VkDevice vk_device = {}; {
+        VkDevice logical_device = {}; {
             // query available hardware
             uint32_t device_count = 0;
             vr = vkEnumeratePhysicalDevices(vk_instance, &device_count, nullptr);
@@ -153,11 +153,23 @@ int main()
                 }
             }
 
-            // create device interface
-            VkDeviceCreateInfo info = {};
-            info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            //  define device queue properties
+            std::vector<float> priorities = {1.0};
+            std::vector<VkDeviceQueueCreateInfo> queues;
 
-            vr = vkCreateDevice(devices[0], &info, NULL, &vk_device);
+            VkDeviceQueueCreateInfo queue_info = {};
+            queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            queue_info.queueFamilyIndex = 0;
+            queue_info.pQueuePriorities = priorities.data();
+            queues.push_back(queue_info);
+
+            // define device interface
+            VkDeviceCreateInfo device_info = {};
+            device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            device_info.pQueueCreateInfos = queues.data();
+            device_info.queueCreateInfoCount = queues.size();
+
+            vr = vkCreateDevice(devices[0], &device_info, NULL, &logical_device);
             CHECK_RESULT(vr);
         };
 
