@@ -77,19 +77,25 @@ int main()
         // instance configuratuion
         VkInstanceCreateInfo instance_info = {};
 
-        // basic config
-        instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instance_info.pApplicationInfo = &app_info;
-
-        // create list of extension requirements
-        std::vector<char*> extensions;
 
         // query SDL extension requirements
+        std::vector<char*> extensions = {};
         u32 sdl_n_extensions = 0;
+        SDL_bool result = SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, nullptr);
         SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, nullptr);
+
+        if(result == SDL_FALSE)
+        {
+            std::cerr << "SDL ERROR: " << SDL_GetError() << std::endl;
+            std::exit(0);
+        };
+
         extensions.resize(sdl_n_extensions);
         SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, (const char**) extensions.data());
 
+        // basic config
+        instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        instance_info.pApplicationInfo = &app_info;
         instance_info.enabledExtensionCount   = extensions.size();
         instance_info.ppEnabledExtensionNames = extensions.data();
 
@@ -187,7 +193,7 @@ int main()
                 }
             }
         }
-        // select physical device
+        // Select physical device / GPU hardware
         vk_physical_device = physical_devices[target_physical_device_index];
         // sanity check queue family properties to ensure capabilities
         if (
@@ -198,33 +204,34 @@ int main()
             return -1;
         }
 
-        // configure logical device
-        VkDeviceCreateInfo device_info = {};
-        device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-        // configure queue selection
+        // Configure queue
         // this demo will only require a single queue with graphics and transfer capabilities
-        std::vector<const char *> extension_names = {};
-        extension_names.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
         VkDeviceQueueCreateInfo queue_info = {};
         queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queue_info.queueFamilyIndex = target_queue_family_index;
         f32 queue_priority = 1.0;
         queue_info.pQueuePriorities = &queue_priority;
         queue_info.queueCount       = 1;
+
+        // Configure logical device - is used to interface with physical device
+        std::vector<const char *> extension_names = {};
+        extension_names.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        
+        VkDeviceCreateInfo device_info = {};
+        device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         device_info.ppEnabledExtensionNames = extension_names.data();
         device_info.enabledExtensionCount = extension_names.size();
         device_info.pQueueCreateInfos    = &queue_info;
         device_info.queueCreateInfoCount = 1;
 
-        // create logical device
+        // Create logical device
         vr = vkCreateDevice(vk_physical_device, &device_info, NULL, &vk_device);
         CHECK_RESULT(vr);
     };
 
 
     //  Swapchain creation
+    //  This application assumes that there will only ever be one swapchain because things like screen resize don't occur during runtime
     VkSwapchainKHR vk_swapchain = {}; {
         u32 extension_property_count = 0;
         std::vector<VkExtensionProperties> extension_props = {};
@@ -259,7 +266,7 @@ int main()
         swapchain_info.imageExtent = surface_capabilities.currentExtent;
         swapchain_info.clipped = VK_TRUE;
 
-        // vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
+        vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
 
@@ -294,7 +301,6 @@ int main()
     // CLEANUP
     //
 
-    SDL_DestroyWindowSurface(window);
     vkDestroyDevice(vk_device, NULL);
     vkDestroyInstance(vk_instance, NULL);
     SDL_DestroyWindow(window);
