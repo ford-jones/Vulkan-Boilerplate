@@ -78,15 +78,9 @@ int main()
         app_info.pEngineName      = "Demo Engine";
         app_info.apiVersion       = VK_API_VERSION_1_0;
 
-        // instance configuratuion
-        VkInstanceCreateInfo instance_info = {};
-
-        // basic config
-        instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instance_info.pApplicationInfo = &app_info;
 
         // create list of extension requirements
-        std::vector<const char*> extensions;
+        std::vector<const char*> extensions = {};
 
         // query SDL extension requirements
         if (!COUNT_APPEND_HELPER(extensions, SDL_Vulkan_GetInstanceExtensions, window))
@@ -95,14 +89,37 @@ int main()
             return -1;
         }
 
-        instance_info.enabledExtensionCount   = extensions.size();
-        instance_info.ppEnabledExtensionNames = extensions.data();
-
         // log extension requirements
         std::cout << "Requiring extensions:" << std::endl;
         for (int i = 0; i < extensions.size(); i++) {
             std::cout << extensions[i] << std::endl;
         };
+
+        //  Layer properties for the instance configuration
+        u32 layer_prop_count = 0;
+        std::vector<VkLayerProperties> layer_props = {};
+        vkEnumerateInstanceLayerProperties(&layer_prop_count, nullptr);
+        layer_props.resize(layer_prop_count);
+        vkEnumerateInstanceLayerProperties(&layer_prop_count, layer_props.data());
+
+        //  List available layer properties
+        std::cout << "Available instance-layer properties:" << std::endl;
+        for(const auto &layer_prop : layer_props)
+        {
+            std::cout << layer_prop.layerName << std::endl;
+        }
+
+        //  Enable API validation layer
+        std::vector<char *> layers = {"VK_LAYER_KHRONOS_validation"};
+
+        // Instance configuration
+        VkInstanceCreateInfo instance_info = {};
+        instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        instance_info.pApplicationInfo = &app_info;
+        instance_info.ppEnabledLayerNames = layers.data();
+        instance_info.enabledLayerCount = layers.size();
+        instance_info.enabledExtensionCount   = extensions.size();
+        instance_info.ppEnabledExtensionNames = extensions.data();
 
         // create vulkan instance
         vr = vkCreateInstance(&instance_info, NULL, &vk_instance);
