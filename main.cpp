@@ -1,14 +1,12 @@
 #include <iostream>
+#include <vector>
 
 #include <vulkan/vulkan.h>
-#include <vector>
 
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_main.h>
 #include <SDL2/SDL_vulkan.h>
-
-#define CHECK_RESULT(VR) if ((VR) != VK_SUCCESS) { printf("VULKAN ERROR %d (%x): %s(%d)\n", (VR), (VR), __FILE__, __LINE__); std::exit((VR));}
 
 typedef int8_t    i8;
 typedef int16_t   i16;
@@ -26,6 +24,12 @@ typedef uintptr_t uptr;
 
 typedef float  f32;
 typedef double f64;
+
+#define CHECK_RESULT(VR) if ((VR) != VK_SUCCESS) { printf("VULKAN ERROR %d (%x): %s(%d)\n", (VR), (VR), __FILE__, __LINE__); std::exit((VR)); }
+
+// macro to help with Get_X(Args args..., u32 *count, X *array) calling pattern where array must be called with nullptr to retrive the required count value
+// allocates space for appends the resulting array to the end of a vector
+#define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS, &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS, &count, VECTOR.data()+(VECTOR.size()-count)); })()
 
 #define GPU_TYPE_PREFERENCE VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
 
@@ -82,13 +86,14 @@ int main()
         instance_info.pApplicationInfo = &app_info;
 
         // create list of extension requirements
-        std::vector<char*> extensions;
+        std::vector<const char*> extensions;
 
         // query SDL extension requirements
-        u32 sdl_n_extensions = 0;
-        SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, nullptr);
-        extensions.resize(sdl_n_extensions);
-        SDL_Vulkan_GetInstanceExtensions(window, &sdl_n_extensions, (const char**) extensions.data());
+        if (!COUNT_APPEND_HELPER(extensions, SDL_Vulkan_GetInstanceExtensions, window))
+        {
+            std::cerr << SDL_GetError() << std::endl;
+            return -1;
+        }
 
         instance_info.enabledExtensionCount   = extensions.size();
         instance_info.ppEnabledExtensionNames = extensions.data();
@@ -123,22 +128,19 @@ int main()
         std::vector<VkPhysicalDevice> physical_devices;
         {
             // query available hardware
-            uint32_t physical_device_count = 0;
-            vr = vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, nullptr);
-            std::cout << "Querying [" << physical_device_count << "] physical devices:" << std::endl;
-            if(physical_device_count < 1)
+            vr = COUNT_APPEND_HELPER(physical_devices, vkEnumeratePhysicalDevices, vk_instance);
+            CHECK_RESULT(vr);
+
+            std::cout << "Querying [" << physical_devices.size() << "] physical devices:" << std::endl;
+            if(physical_devices.size() < 1)
             {
                 std::cerr << "No physical devices found" << std::endl;
                 std::exit(-1);
             };
 
-            physical_devices.resize(physical_device_count);
-            vr = vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
-            CHECK_RESULT(vr);
-
             // check hardware capabilities
             std::vector<VkQueueFamilyProperties> queue_families;
-            for (u32 physical_device_index = 0; physical_device_index < physical_device_count; physical_device_index++)
+            for (u32 physical_device_index = 0; physical_device_index < physical_devices.size(); physical_device_index++)
             {
                 // log the device name
                 VkPhysicalDeviceProperties properties = {};
@@ -155,14 +157,12 @@ int main()
                 std::cout << std::endl;
 
                 // check device queue families
-                u32 n_queue_families = {};
-                vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[physical_device_index], &n_queue_families, nullptr);
-                queue_families.resize(n_queue_families);
-                vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[physical_device_index], &n_queue_families, queue_families.data());
+                queue_families.clear();
+                COUNT_APPEND_HELPER(queue_families, vkGetPhysicalDeviceQueueFamilyProperties, physical_devices[physical_device_index]);
 
                 // log physical device queue families
-                std::cout << "queue families: [" << n_queue_families << "]" << std::endl;
-                for (u32 queue_family_index = 0; queue_family_index < n_queue_families; queue_family_index++)
+                std::cout << "queue families: [" << queue_families.size() << "]" << std::endl;
+                for (u32 queue_family_index = 0; queue_family_index < queue_families.size(); queue_family_index++)
                 {
                     VkQueueFamilyProperties family = queue_families[queue_family_index];
 
@@ -223,18 +223,15 @@ int main()
         CHECK_RESULT(vr);
     };
 
-
     //  Swapchain creation
     VkSwapchainKHR vk_swapchain = {}; {
-        u32 extension_property_count = 0;
         std::vector<VkExtensionProperties> extension_props = {};
-        
+
         //  Query available hardware extensions and surface properties
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
-        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, nullptr);
-        extension_props.resize(extension_property_count);
-        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, extension_props.data());
+        vr = COUNT_APPEND_HELPER(extension_props, vkEnumerateDeviceExtensionProperties, vk_physical_device, nullptr);
+        CHECK_RESULT(vr);
 
         //  Log extension names
         std::cout << "Available GPU extensions:" << std::endl;
@@ -259,7 +256,7 @@ int main()
         swapchain_info.imageExtent = surface_capabilities.currentExtent;
         swapchain_info.clipped = VK_TRUE;
 
-        // vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
+        vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
 
