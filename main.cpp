@@ -39,6 +39,7 @@ typedef double f64;
 bool main_list_supporeted_extensions = false;
 bool main_list_physical_devices_info = false;
 bool main_prefer_high_performance_device = false; // TODO: unimplemented
+bool main_disabled_validation_layer = false;
 
 int main(i32 argc, char** argv)
 {
@@ -50,6 +51,7 @@ int main(i32 argc, char** argv)
         if      (STREQ("-x", argv[i]) || STREQ("--list-extensions", argv[i])) main_list_supporeted_extensions = true;
         else if (STREQ("-d", argv[i]) || STREQ("--list-devices",    argv[i])) main_list_physical_devices_info = true;
         else if (STREQ("-p", argv[i]) || STREQ("--high-perf",       argv[i])) main_prefer_high_performance_device = true;
+        else if (STREQ("-z", argv[i]) || STREQ("--no-validate",   argv[i])) main_disabled_validation_layer = true;
         else
         {
             std::cout << "Unkown argument: " << argv[i] << std::endl;
@@ -146,9 +148,13 @@ int main(i32 argc, char** argv)
         std::cout << std::endl;
 
         // INSTANCE LAYERS
+        std::vector<const char *> layers = {};
 
         //  Enable API validation layer
-        std::vector<const char *> layers = { "VK_LAYER_KHRONOS_validation" };
+        if(!main_disabled_validation_layer)
+        {
+            layers.push_back("VK_LAYER_KHRONOS_validation");
+        };
 
         // log layer requirements
         std::cout << "Requiring layers:" << std::endl;
