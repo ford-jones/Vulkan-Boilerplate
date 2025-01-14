@@ -51,7 +51,7 @@ int main(i32 argc, char** argv)
         if      (STREQ("-x", argv[i]) || STREQ("--list-extensions", argv[i])) main_list_supporeted_extensions = true;
         else if (STREQ("-d", argv[i]) || STREQ("--list-devices",    argv[i])) main_list_physical_devices_info = true;
         else if (STREQ("-p", argv[i]) || STREQ("--high-perf",       argv[i])) main_prefer_high_performance_device = true;
-        else if (STREQ("-z", argv[i]) || STREQ("--no-validate",   argv[i])) main_disabled_validation_layer = true;
+        else if (STREQ("-z", argv[i]) || STREQ("--no-validate",     argv[i])) main_disabled_validation_layer = true;
         else
         {
             std::cout << "Unkown argument: " << argv[i] << std::endl;
