@@ -29,8 +29,8 @@ typedef double f64;
 
 // macro to help with Get_X(Args args..., u32 *count, X *array) calling pattern where array must be called with nullptr to retrive the required count value
 // allocates space for appends the resulting array to the end of a vector
-#define _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS &count, VECTOR.data()+(VECTOR.size()-count)); })()
-#define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS,)
+#define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS, &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS, &count, VECTOR.data()+(VECTOR.size()-count)); })()
+#define COUNT_APPEND_HELPER0(VECTOR, FUNC)         ([&]() { u32 count = 0; FUNC(      &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(      &count, VECTOR.data()+(VECTOR.size()-count)); })()
 
 // simple macro to safely and easily compare command-line arguments
 #define STREQ(STR, EXPR) (strncmp((STR), (EXPR), sizeof(STR)/sizeof(*(STR))) == 0)
@@ -106,7 +106,7 @@ int main(i32 argc, char** argv)
         {
             //  List available instance layers
             std::vector<VkLayerProperties> layers = {};
-            vr = COUNT_APPEND_HELPER(layers, vkEnumerateInstanceLayerProperties);
+            vr = COUNT_APPEND_HELPER0(layers, vkEnumerateInstanceLayerProperties);
             CHECK_RESULT(vr);
             std::cout << "Available instance layers:" << std::endl;
             for(const auto &layer : layers)
