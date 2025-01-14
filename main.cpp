@@ -178,10 +178,14 @@ int main(i32 argc, char** argv)
     VkSurfaceKHR vk_surface = {};
     SDL_Vulkan_CreateSurface(window, vk_instance, &vk_surface);
 
-    // Create device interface
-    // This is the main API interface for creating and managing GPU resources
-    VkPhysicalDevice           vk_physical_device = {};
-    VkDevice                   vk_device = {};
+    // Create device interface and the queue
+    // The device is the main API interface for creating and managing GPU resources
+    // The queue is responsible for executing workloads on the device
+    // Queue creation is tightly coupled with device creation, so both are created here
+    // The physical device is retained to query cababilities only; it carries little API functionality
+    VkPhysicalDevice vk_physical_device = {};
+    VkDevice         vk_device = {};
+    VkQueue          vk_queue = {};
     {
         // select physical device and queue family to execute on
         // TOOD: implement selection logic
@@ -307,6 +311,11 @@ int main(i32 argc, char** argv)
                 std::cout << extension_property.extensionName << std::endl;
             };
         }
+
+        // Retrieve the queue
+        std::cout << "Retrieving device queue..." << std::endl;
+        // All queue families have at least 1 queue, so queue index 0 can be safely retrieved
+        vkGetDeviceQueue(vk_device, target_queue_family_index, 0, &vk_queue);
     };
 
     //  Swapchain creation
