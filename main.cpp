@@ -204,18 +204,62 @@ int main()
 
         // configure queue selection
         // this demo will only require a single queue with graphics and transfer capabilities
+        std::vector<const char *> extension_names = {};
+        extension_names.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
         VkDeviceQueueCreateInfo queue_info = {};
         queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queue_info.queueFamilyIndex = target_queue_family_index;
         f32 queue_priority = 1.0;
         queue_info.pQueuePriorities = &queue_priority;
         queue_info.queueCount       = 1;
-
+        device_info.ppEnabledExtensionNames = extension_names.data();
+        device_info.enabledExtensionCount = extension_names.size();
         device_info.pQueueCreateInfos    = &queue_info;
         device_info.queueCreateInfoCount = 1;
 
         // create logical device
         vr = vkCreateDevice(vk_physical_device, &device_info, NULL, &vk_device);
+        CHECK_RESULT(vr);
+    };
+
+
+    //  Swapchain creation
+    VkSwapchainKHR vk_swapchain = {}; {
+        u32 extension_property_count = 0;
+        std::vector<VkExtensionProperties> extension_props = {};
+        
+        //  Query available hardware extensions and surface properties
+        VkSurfaceCapabilitiesKHR surface_capabilities = {};
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
+        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, nullptr);
+        extension_props.resize(extension_property_count);
+        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, extension_props.data());
+
+        //  Log extension names
+        std::cout << "Available GPU extensions:" << std::endl;
+        for(const auto&extension_property : extension_props)
+        {
+            std::cout << extension_property.extensionName << std::endl;
+        };
+
+        //  Define swapchain interface
+        VkSwapchainCreateInfoKHR swapchain_info = {};
+        swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapchain_info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        swapchain_info.imageUsage = VK_IMAGE_USAGE_SAMPLED_BIT;
+        swapchain_info.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchain_info.compositeAlpha  = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        swapchain_info.minImageCount = 2;
+        swapchain_info.imageArrayLayers = 1;
+        swapchain_info.surface = vk_surface;
+        swapchain_info.imageExtent = surface_capabilities.currentExtent;
+        swapchain_info.clipped = VK_TRUE;
+
+        // vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
 
