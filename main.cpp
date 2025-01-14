@@ -29,7 +29,8 @@ typedef double f64;
 
 // macro to help with Get_X(Args args..., u32 *count, X *array) calling pattern where array must be called with nullptr to retrive the required count value
 // allocates space for appends the resulting array to the end of a vector
-#define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS, &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS, &count, VECTOR.data()+(VECTOR.size()-count)); })()
+#define _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS &count, VECTOR.data()+(VECTOR.size()-count)); })()
+#define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS,)
 
 #define GPU_TYPE_PREFERENCE VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
 
@@ -95,11 +96,9 @@ int main()
         };
 
         //  Layer properties for the instance configuration
-        u32 layer_prop_count = 0;
         std::vector<VkLayerProperties> layer_props = {};
-        vkEnumerateInstanceLayerProperties(&layer_prop_count, nullptr);
-        layer_props.resize(layer_prop_count);
-        vkEnumerateInstanceLayerProperties(&layer_prop_count, layer_props.data());
+        vr = COUNT_APPEND_HELPER(layer_props, vkEnumerateInstanceLayerProperties);
+        CHECK_RESULT(vr);
 
         //  List available layer properties
         std::cout << "Available instance-layer properties:" << std::endl;
