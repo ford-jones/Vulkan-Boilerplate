@@ -104,16 +104,25 @@ int main(i32 argc, char** argv)
 
         if (main_list_supporeted_extensions)
         {
-            //  Collect supported instance layers
+            //  List available instance layers
             std::vector<VkLayerProperties> layers = {};
             vr = COUNT_APPEND_HELPER(layers, vkEnumerateInstanceLayerProperties);
             CHECK_RESULT(vr);
-
-            //  List available layer properties
             std::cout << "Available instance layers:" << std::endl;
-            for(const auto &layer_prop : layers)
+            for(const auto &layer : layers)
             {
-                std::cout << layer_prop.layerName << std::endl;
+                std::cout << layer.layerName << std::endl;
+            }
+            std::cout << std::endl;
+
+            //  List available instance extensions
+            std::vector<VkExtensionProperties> extensions = {};
+            vr = COUNT_APPEND_HELPER(extensions, vkEnumerateInstanceExtensionProperties, nullptr);
+            CHECK_RESULT(vr);
+            std::cout << "Available instance extensions:" << std::endl;
+            for(const auto &extension : extensions)
+            {
+                std::cout << extension.extensionName << std::endl;
             }
             std::cout << std::endl;
         }
