@@ -109,7 +109,7 @@ int main()
         }
 
         //  Enable API validation layer
-        std::vector<char *> layers = {"VK_LAYER_KHRONOS_validation"};
+        std::vector<const char *> layers = { "VK_LAYER_KHRONOS_validation" };
 
         // Instance configuration
         VkInstanceCreateInfo instance_info = {};
