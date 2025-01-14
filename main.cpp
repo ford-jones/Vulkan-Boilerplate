@@ -111,6 +111,7 @@ int main()
 
     // Create device interface
     // This is the main API interface for creating and managing GPU resources
+    VkPhysicalDevice vk_physical_device = {};
     VkDevice vk_device = {};
     {
         // query available hardware
@@ -123,7 +124,6 @@ int main()
             std::cerr << "No physical devices found" << std::endl;
             std::exit(0);
         };
-
         std::vector<VkPhysicalDevice> physical_devices;
         physical_devices.resize(physical_device_count);
         vr = vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
@@ -173,6 +173,8 @@ int main()
                 std::cout << " transfer granularity: (" << family.minImageTransferGranularity.width << ", " << family.minImageTransferGranularity.height << ", " << family.minImageTransferGranularity.depth << ")";
                 std::cout << std::endl;
             }
+
+            vk_physical_device = physical_devices[0];
         }
 
         // create device interface
@@ -196,6 +198,36 @@ int main()
         device_info.queueCreateInfoCount = queues.size();
 
         vr = vkCreateDevice(physical_devices[0], &device_info, NULL, &vk_device);
+        CHECK_RESULT(vr);
+    };
+
+
+    //  Swapchain creation
+    VkSwapchainKHR vk_swapchain = {}; {
+        u32 extension_property_count = 0;
+        std::vector<VkExtensionProperties> extension_props = {};
+
+        VkSurfaceCapabilitiesKHR surface_capabilities = {};
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
+        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, nullptr);
+        extension_props.resize(extension_property_count);
+        vkEnumerateDeviceExtensionProperties(vk_physical_device, nullptr, &extension_property_count, extension_props.data());
+
+        std::cout << "Physical device extensions:" << std::endl;
+        for(const auto&extension_property : extension_props)
+        {
+            std::cout << extension_property.extensionName << std::endl;
+        };
+
+        VkSwapchainCreateInfoKHR swapchain_info = {};
+        swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapchain_info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        swapchain_info.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        swapchain_info.surface = vk_surface;
+        swapchain_info.imageExtent = surface_capabilities.currentExtent;
+        swapchain_info.minImageCount = 1;
+
+        vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, NULL, &vk_swapchain);
         CHECK_RESULT(vr);
     };
 
