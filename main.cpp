@@ -374,6 +374,23 @@ int main(i32 argc, char** argv)
         CHECK_RESULT(vr);
     }
 
+    // Command buffer allocation
+    // This is the API endpoint for recording API instructions, after which they are submitted to the queue for execution
+    // Once execution has finished, their containing command pool must be reset so that commands may be recorded for the next execution
+    VkCommandBuffer cmd_buf = {};
+    {
+        VkCommandBufferAllocateInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        info.commandPool = cmd_pool;
+        info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // primary command buffers are for directly executing commands on a command queue
+        info.commandBufferCount = 1;
+
+        // Allocate command buffer
+        std::cout << "Allocating command buffer..." << std::endl;
+        vr = vkAllocateCommandBuffers(vk_device, &info, &cmd_buf);
+        CHECK_RESULT(vr);
+    }
+
     //
     // MAIN LOOP
     //
@@ -405,10 +422,14 @@ int main(i32 argc, char** argv)
     // CLEANUP
     //
 
+    // pipeline
+    vkDestroyCommandPool(vk_device, cmd_pool, nullptr);
+    // vulkan
     vkDestroySwapchainKHR(vk_device, vk_swapchain, nullptr);
     vkDestroySurfaceKHR(vk_instance, vk_surface, nullptr);
     vkDestroyDevice(vk_device, NULL);
     vkDestroyInstance(vk_instance, NULL);
+    // sdl
     SDL_DestroyWindow(window);
 
     return 0;
