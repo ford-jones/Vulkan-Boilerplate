@@ -32,10 +32,31 @@ typedef double f64;
 #define _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) ([&]() { u32 count = 0; FUNC(ARGS &count, nullptr); VECTOR.resize(VECTOR.size() + count); return FUNC(ARGS &count, VECTOR.data()+(VECTOR.size()-count)); })()
 #define COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS...) _COUNT_APPEND_HELPER(VECTOR, FUNC, ARGS,)
 
-#define GPU_TYPE_PREFERENCE VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+// simple macro to safely and easily compare command-line arguments
+#define STREQ(STR, EXPR) (strncmp((STR), (EXPR), sizeof(STR)/sizeof(*(STR))) == 0)
 
-int main()
+// program arguments
+bool main_list_supporeted_extensions = false;
+bool main_list_physical_devices_info = false;
+bool main_prefer_high_performance_device = false; // TODO: unimplemented
+
+int main(i32 argc, char** argv)
 {
+    //
+    // PARSE ARGUMENTS
+    //
+
+    for (i32 i = 1 ; i < argc; i++) {
+        if      (STREQ("-x", argv[i]) || STREQ("--list-extensions", argv[i])) main_list_supporeted_extensions = true;
+        else if (STREQ("-d", argv[i]) || STREQ("--list-devices",    argv[i])) main_list_physical_devices_info = true;
+        else if (STREQ("-p", argv[i]) || STREQ("--high-perf",       argv[i])) main_prefer_high_performance_device = true;
+        else
+        {
+            std::cout << "Unkown argument: " << argv[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
+
     //
     // SDL INIT
     //
@@ -79,6 +100,24 @@ int main()
         app_info.pEngineName      = "Demo Engine";
         app_info.apiVersion       = VK_API_VERSION_1_0;
 
+        // INSTANCE EXTENSIONS
+
+        if (main_list_supporeted_extensions)
+        {
+            //  Collect supported instance layers
+            std::vector<VkLayerProperties> layers = {};
+            vr = COUNT_APPEND_HELPER(layers, vkEnumerateInstanceLayerProperties);
+            CHECK_RESULT(vr);
+
+            //  List available layer properties
+            std::cout << "Available instance layers:" << std::endl;
+            for(const auto &layer_prop : layers)
+            {
+                std::cout << layer_prop.layerName << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
         // create list of extension requirements
         std::vector<const char*> extensions = {};
 
@@ -91,35 +130,36 @@ int main()
 
         // log extension requirements
         std::cout << "Requiring extensions:" << std::endl;
-        for (int i = 0; i < extensions.size(); i++) {
+        for (int i = 0; i < extensions.size(); i++)
+        {
             std::cout << extensions[i] << std::endl;
         };
+        std::cout << std::endl;
 
-        //  Layer properties for the instance configuration
-        std::vector<VkLayerProperties> layer_props = {};
-        vr = COUNT_APPEND_HELPER(layer_props, vkEnumerateInstanceLayerProperties);
-        CHECK_RESULT(vr);
-
-        //  List available layer properties
-        std::cout << "Available instance-layer properties:" << std::endl;
-        for(const auto &layer_prop : layer_props)
-        {
-            std::cout << layer_prop.layerName << std::endl;
-        }
+        // INSTANCE LAYERS
 
         //  Enable API validation layer
         std::vector<const char *> layers = { "VK_LAYER_KHRONOS_validation" };
 
-        // Instance configuration
+        // log layer requirements
+        std::cout << "Requiring layers:" << std::endl;
+        for (int i = 0; i < layers.size(); i++)
+        {
+            std::cout << layers[i] << std::endl;
+        };
+
+        // INSTANCE INFO
+
         VkInstanceCreateInfo instance_info = {};
         instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instance_info.pApplicationInfo = &app_info;
-        instance_info.ppEnabledLayerNames = layers.data();
-        instance_info.enabledLayerCount = layers.size();
+        instance_info.pApplicationInfo        = &app_info;
+        instance_info.ppEnabledLayerNames     = layers.data();
+        instance_info.enabledLayerCount       = layers.size();
         instance_info.enabledExtensionCount   = extensions.size();
         instance_info.ppEnabledExtensionNames = extensions.data();
 
         // create vulkan instance
+        std::cout << "Creating instance..." << std::endl;
         vr = vkCreateInstance(&instance_info, NULL, &vk_instance);
         CHECK_RESULT(vr);
     };
@@ -146,7 +186,7 @@ int main()
             vr = COUNT_APPEND_HELPER(physical_devices, vkEnumeratePhysicalDevices, vk_instance);
             CHECK_RESULT(vr);
 
-            std::cout << "Querying [" << physical_devices.size() << "] physical devices:" << std::endl;
+            std::cout << std::endl << "Querying [" << physical_devices.size() << "] physical devices:" << std::endl;
             if(physical_devices.size() < 1)
             {
                 std::cerr << "No physical devices found" << std::endl;
@@ -157,47 +197,54 @@ int main()
             std::vector<VkQueueFamilyProperties> queue_families;
             for (u32 physical_device_index = 0; physical_device_index < physical_devices.size(); physical_device_index++)
             {
-                // log the device name
+                // get device
                 VkPhysicalDeviceProperties properties = {};
                 vkGetPhysicalDeviceProperties(physical_devices[physical_device_index], &properties);
-                std::cout << std::endl << properties.deviceName << std::endl;
-
-                // log device type
-                std::cout << "device type: ";
-                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER)          std::cout << "OTHER";
-                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)   std::cout << "DISCRETE_GPU";
-                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) std::cout << "INTEGRATED_GPU";
-                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU)            std::cout << "CPU";
-                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)    std::cout << "VIRTUAL_GPU";
-                std::cout << std::endl;
 
                 // check device queue families
                 queue_families.clear();
                 COUNT_APPEND_HELPER(queue_families, vkGetPhysicalDeviceQueueFamilyProperties, physical_devices[physical_device_index]);
 
-                // log physical device queue families
-                std::cout << "queue families: [" << queue_families.size() << "]" << std::endl;
-                for (u32 queue_family_index = 0; queue_family_index < queue_families.size(); queue_family_index++)
+                // save target queue family properties
+                // TODO: implement sanity checking and target selection
+                if (physical_device_index == target_physical_device_index)
                 {
-                    VkQueueFamilyProperties family = queue_families[queue_family_index];
+                    target_queue_family_properties = queue_families[target_queue_family_index];
+                }
 
-                    // HACK: extracts device 0's queue family 0 for final usage
-                    if (physical_device_index == target_physical_device_index && queue_family_index == target_queue_family_index) {
-                        target_queue_family_properties = family;
+                // log the device name
+                std::cout << properties.deviceName << std::endl;
+                if (main_list_physical_devices_info)
+                {
+                    // log device type
+                    std::cout << "device type: ";
+                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER)          std::cout << "OTHER";
+                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)   std::cout << "DISCRETE_GPU";
+                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) std::cout << "INTEGRATED_GPU";
+                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU)            std::cout << "CPU";
+                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)    std::cout << "VIRTUAL_GPU";
+                    std::cout << std::endl;
+
+                    // log physical device queue families
+                    std::cout << "queue families: [" << queue_families.size() << "]" << std::endl;
+                    for (u32 queue_family_index = 0; queue_family_index < queue_families.size(); queue_family_index++)
+                    {
+                        VkQueueFamilyProperties family = queue_families[queue_family_index];
+
+                        // log family index and count
+                        std::cout << "family " << queue_family_index << ":\tcount:\t" << family.queueCount << "\tflags: | ";
+                        // log queue family flags
+                        std::cout << (family.queueFlags & VK_QUEUE_GRAPHICS_BIT         ? "GRAPHICS | "       : "         | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_COMPUTE_BIT          ? "COMPUTE | "        : "        | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_TRANSFER_BIT         ? "TRANSFER | "       : "         | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT   ? "SPARSE_BINDING | " : "               | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "DECODE | "         : "       | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "ENCODE | "         : "       | ");
+                        std::cout << (family.queueFlags & VK_QUEUE_PROTECTED_BIT        ? "PROTECTED | "      : "          | ");
+                        // log image transfer granularity
+                        std::cout << " transfer granularity: (" << family.minImageTransferGranularity.width << ", " << family.minImageTransferGranularity.height << ", " << family.minImageTransferGranularity.depth << ")";
+                        std::cout << std::endl;
                     }
-
-                    // log family index and count
-                    std::cout << "family " << queue_family_index << ":\tcount:\t" << family.queueCount << "\tflags: | ";
-                    // log queue family flags
-                    std::cout << (family.queueFlags & VK_QUEUE_GRAPHICS_BIT         ? "GRAPHICS | "       : "         | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_COMPUTE_BIT          ? "COMPUTE | "        : "        | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_TRANSFER_BIT         ? "TRANSFER | "       : "         | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT   ? "SPARSE_BINDING | " : "               | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "DECODE | "         : "       | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "ENCODE | "         : "       | ");
-                    std::cout << (family.queueFlags & VK_QUEUE_PROTECTED_BIT        ? "PROTECTED | "      : "          | ");
-                    // log image transfer granularity
-                    std::cout << " transfer granularity: (" << family.minImageTransferGranularity.width << ", " << family.minImageTransferGranularity.height << ", " << family.minImageTransferGranularity.depth << ")";
                     std::cout << std::endl;
                 }
             }
@@ -234,6 +281,7 @@ int main()
         device_info.queueCreateInfoCount = 1;
 
         // Create logical device
+        std::cout << "Creating device..." << std::endl;
         vr = vkCreateDevice(vk_physical_device, &device_info, NULL, &vk_device);
         CHECK_RESULT(vr);
     };
@@ -241,20 +289,23 @@ int main()
     //  Swapchain creation
     //  This application assumes that there will only ever be one swapchain because things like screen resize don't occur during runtime
     VkSwapchainKHR vk_swapchain = {}; {
-        std::vector<VkExtensionProperties> extension_props = {};
+        if (main_list_supporeted_extensions)
+        {
+            std::vector<VkExtensionProperties> extension_props = {};
+            vr = COUNT_APPEND_HELPER(extension_props, vkEnumerateDeviceExtensionProperties, vk_physical_device, nullptr);
+            CHECK_RESULT(vr);
+
+            //  Log extension names
+            std::cout << std::endl << "Available device extensions:" << std::endl;
+            for(const auto&extension_property : extension_props)
+            {
+                std::cout << extension_property.extensionName << std::endl;
+            };
+        }
 
         //  Query available hardware extensions and surface properties
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
-        vr = COUNT_APPEND_HELPER(extension_props, vkEnumerateDeviceExtensionProperties, vk_physical_device, nullptr);
-        CHECK_RESULT(vr);
-
-        //  Log extension names
-        std::cout << "Available GPU extensions:" << std::endl;
-        for(const auto&extension_property : extension_props)
-        {
-            std::cout << extension_property.extensionName << std::endl;
-        };
 
         //  Define swapchain interface
         VkSwapchainCreateInfoKHR swapchain_info = {};
