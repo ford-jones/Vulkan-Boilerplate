@@ -84,7 +84,8 @@ int main(i32 argc, char** argv)
     SDL_Surface* sdl_surface = SDL_GetWindowSurface(window);
 
     //
-    // VULKAN INIT
+    // VULKAN DEVICE INIT
+    // After initializing SDL, we create the core set of Vulkan objects to interact with SDL's windowing system
     //
 
     VkResult vr = VK_SUCCESS;
@@ -182,16 +183,17 @@ int main(i32 argc, char** argv)
     // The device is the main API interface for creating and managing GPU resources
     // The queue is responsible for executing workloads on the device
     // Queue creation is tightly coupled with device creation, so both are created here
+    // The queue family index is an integer that is required by several other functions
     // The physical device is retained to query cababilities only; it carries little API functionality
     VkPhysicalDevice vk_physical_device = {};
     VkDevice         vk_device = {};
+    u32              vk_queue_family_index = 0; // TODO: implement selection logic
     VkQueue          vk_queue = {};
     {
         // select physical device and queue family to execute on
         // TOOD: implement selection logic
         u32                     target_physical_device_index = 0;
         VkQueueFamilyProperties target_queue_family_properties = {};
-        u32                     target_queue_family_index = 0;
 
         std::vector<VkPhysicalDevice> physical_devices;
         {
@@ -222,7 +224,7 @@ int main(i32 argc, char** argv)
                 // TODO: implement sanity checking and target selection
                 if (physical_device_index == target_physical_device_index)
                 {
-                    target_queue_family_properties = queue_families[target_queue_family_index];
+                    target_queue_family_properties = queue_families[vk_queue_family_index];
                 }
 
                 // log the device name
@@ -277,7 +279,7 @@ int main(i32 argc, char** argv)
         // this demo will only require a single queue with graphics and transfer capabilities
         VkDeviceQueueCreateInfo queue_info = {};
         queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queue_info.queueFamilyIndex = target_queue_family_index;
+        queue_info.queueFamilyIndex = vk_queue_family_index;
         f32 queue_priority = 1.0;
         queue_info.pQueuePriorities = &queue_priority;
         queue_info.queueCount       = 1;
@@ -315,7 +317,7 @@ int main(i32 argc, char** argv)
         // Retrieve the queue
         std::cout << "Retrieving device queue..." << std::endl;
         // All queue families have at least 1 queue, so queue index 0 can be safely retrieved
-        vkGetDeviceQueue(vk_device, target_queue_family_index, 0, &vk_queue);
+        vkGetDeviceQueue(vk_device, vk_queue_family_index, 0, &vk_queue);
     };
 
     //  Swapchain creation
@@ -346,6 +348,31 @@ int main(i32 argc, char** argv)
         vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
+
+    //
+    // VULKAN PIPELINE INIT
+    // With the primary Vulkan interfaces initialized, we can start creating our app's graphics pipeline
+    //
+
+    // Command pool creation
+    // This abstracts the backing allocation for command buffers
+    // Synchronisation of command execution must be done explicitly in the pipeline; the command pool must not be reset while it is being executed on the queue
+    VkCommandPool cmd_pool = {};
+    {
+        VkCommandPoolCreateInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        // Flags we may want to use:
+        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : implementation hint, indicates command pool will be reset in a short timeframe
+        // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : enables the use of vkResetCommandBuffer. currently we will use only a single command buffer, so we can just reset the command pool directly
+        info.flags = 0;
+
+        info.queueFamilyIndex = vk_queue_family_index;
+
+        // Create command pool
+        std::cout << "Creating command pool..." << std::endl;
+        vr = vkCreateCommandPool(vk_device, &info, nullptr, &cmd_pool);
+        CHECK_RESULT(vr);
+    }
 
     //
     // MAIN LOOP
