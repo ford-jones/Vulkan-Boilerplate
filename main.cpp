@@ -284,25 +284,26 @@ int main(i32 argc, char** argv)
         std::cout << "Creating device..." << std::endl;
         vr = vkCreateDevice(vk_physical_device, &device_info, NULL, &vk_device);
         CHECK_RESULT(vr);
-    };
 
-    //  Swapchain creation
-    //  This application assumes that there will only ever be one swapchain because things like screen resize don't occur during runtime
-    VkSwapchainKHR vk_swapchain = {}; {
         if (main_list_supporeted_extensions)
         {
-            std::vector<VkExtensionProperties> extension_props = {};
-            vr = COUNT_APPEND_HELPER(extension_props, vkEnumerateDeviceExtensionProperties, vk_physical_device, nullptr);
+            std::vector<VkExtensionProperties> extensions = {};
+            vr = COUNT_APPEND_HELPER(extensions, vkEnumerateDeviceExtensionProperties, vk_physical_device, nullptr);
             CHECK_RESULT(vr);
 
             //  Log extension names
             std::cout << std::endl << "Available device extensions:" << std::endl;
-            for(const auto&extension_property : extension_props)
+            for(const auto&extension_property : extensions)
             {
                 std::cout << extension_property.extensionName << std::endl;
             };
         }
+    };
 
+    //  Swapchain creation
+    //  This application assumes that there will only ever be one swapchain because things like screen resize don't occur during runtime
+    VkSwapchainKHR vk_swapchain = {};
+    {
         //  Query available hardware extensions and surface properties
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
@@ -310,7 +311,7 @@ int main(i32 argc, char** argv)
         //  Define swapchain interface
         VkSwapchainCreateInfoKHR swapchain_info = {};
         swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        swapchain_info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        swapchain_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
         swapchain_info.imageUsage = VK_IMAGE_USAGE_SAMPLED_BIT;
         swapchain_info.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
         swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
@@ -323,6 +324,7 @@ int main(i32 argc, char** argv)
         swapchain_info.imageExtent = surface_capabilities.currentExtent;
         swapchain_info.clipped = VK_TRUE;
 
+        std::cout << "Creating swapchain..." << std::endl;
         vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
