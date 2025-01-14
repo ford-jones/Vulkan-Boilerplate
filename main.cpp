@@ -355,7 +355,7 @@ int main(i32 argc, char** argv)
     //
 
     // Command pool creation
-    // This abstracts the backing allocation for command buffers
+    // This abstracts the backing allocation for command buffers; each command buffer must be created in association with a specific command pool
     // Synchronisation of command execution must be done explicitly in the pipeline; the command pool must not be reset while it is being executed on the queue
     VkCommandPool cmd_pool = {};
     {
@@ -366,7 +366,7 @@ int main(i32 argc, char** argv)
         // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : enables the use of vkResetCommandBuffer. currently we will use only a single command buffer, so we can just reset the command pool directly
         info.flags = 0;
 
-        info.queueFamilyIndex = vk_queue_family_index;
+        info.queueFamilyIndex = vk_queue_family_index; // the command pool needs to know which queue family it will be used for
 
         // Create command pool
         std::cout << "Creating command pool..." << std::endl;
@@ -377,12 +377,13 @@ int main(i32 argc, char** argv)
     // Command buffer allocation
     // This is the API endpoint for recording API instructions, after which they are submitted to the queue for execution
     // Once execution has finished, their containing command pool must be reset so that commands may be recorded for the next execution
+    // This is a primary command buffer, so that commands can be recorded to it and then directly executed on a queue
     VkCommandBuffer cmd_buf = {};
     {
         VkCommandBufferAllocateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         info.commandPool = cmd_pool;
-        info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // primary command buffers are for directly executing commands on a command queue
         info.commandBufferCount = 1;
 
         // Allocate command buffer
