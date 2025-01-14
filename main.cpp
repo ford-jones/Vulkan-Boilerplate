@@ -78,7 +78,6 @@ int main()
         app_info.pEngineName      = "Demo Engine";
         app_info.apiVersion       = VK_API_VERSION_1_0;
 
-
         // create list of extension requirements
         std::vector<const char*> extensions = {};
 
@@ -268,7 +267,7 @@ int main()
         swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         swapchain_info.compositeAlpha  = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        swapchain_info.minImageCount = 2;
+        swapchain_info.minImageCount = 3;
         swapchain_info.imageArrayLayers = 1;
         swapchain_info.surface = vk_surface;
         swapchain_info.imageExtent = surface_capabilities.currentExtent;
@@ -281,6 +280,9 @@ int main()
     //
     // MAIN LOOP
     //
+
+    // is outside the bounds returned by vkGetPhysicalDeviceSurfaceCapabilitiesKHR() (i.e. minImageCount = 3, maxImageCount = 0).
+
 
     while(window_is_open)
     {
