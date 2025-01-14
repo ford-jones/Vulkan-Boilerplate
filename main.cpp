@@ -281,9 +281,6 @@ int main()
     // MAIN LOOP
     //
 
-    // is outside the bounds returned by vkGetPhysicalDeviceSurfaceCapabilitiesKHR() (i.e. minImageCount = 3, maxImageCount = 0).
-
-
     while(window_is_open)
     {
         SDL_Event event;
@@ -311,6 +308,8 @@ int main()
     // CLEANUP
     //
 
+    vkDestroySwapchainKHR(vk_device, vk_swapchain, nullptr);
+    vkDestroySurfaceKHR(vk_instance, vk_surface, nullptr);
     vkDestroyDevice(vk_device, NULL);
     vkDestroyInstance(vk_instance, NULL);
     SDL_DestroyWindow(window);
