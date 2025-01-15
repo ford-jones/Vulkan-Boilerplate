@@ -331,6 +331,15 @@ int main(i32 argc, char** argv)
     const u32 vk_swapchain_min_image_count = 3;
     VkSwapchainKHR vk_swapchain = {};
     {
+        VkBool32 surface_present_support = {};
+        vr = vkGetPhysicalDeviceSurfaceSupportKHR(vk_physical_device, vk_queue_family_index, vk_surface, &surface_present_support);
+        CHECK_RESULT(vr);
+        if (!surface_present_support)
+        {
+            std::cerr << "Device surface does not support swapchain presentation on selected queue family" << std::endl;
+            return -1;
+        }
+
         //  Query available hardware extensions and surface properties
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
