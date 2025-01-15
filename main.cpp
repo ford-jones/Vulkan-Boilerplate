@@ -413,6 +413,19 @@ int main(i32 argc, char** argv)
     vr = vkBeginCommandBuffer(cmd_buf, &cmd_buf_begin_info);
     CHECK_RESULT(vr);
 
+    //  Frame color
+    VkClearColorValue color = {{1.0, 0.0, 1.0}};
+
+    //  Image range definition
+    VkImageSubresourceRange image_range = {};
+    image_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_range.baseMipLevel = 0;
+    image_range.levelCount = 1;
+    image_range.baseArrayLayer = 0;
+    image_range.layerCount = 1;
+
+    vkCmdClearColorImage(cmd_buf, swapchain_images[0], VK_IMAGE_LAYOUT_GENERAL, &color, 1, &image_range);
+
     //
     // MAIN LOOP
     //
