@@ -328,6 +328,7 @@ int main(i32 argc, char** argv)
 
     //  Swapchain creation
     //  This application assumes that there will only ever be one swapchain because things like screen resize don't occur during runtime
+    const u32 vk_swapchain_min_image_count = 3;
     VkSwapchainKHR vk_swapchain = {};
     {
         //  Query available hardware extensions and surface properties
@@ -338,13 +339,13 @@ int main(i32 argc, char** argv)
         VkSwapchainCreateInfoKHR swapchain_info = {};
         swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         swapchain_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-        swapchain_info.imageUsage = VK_IMAGE_USAGE_SAMPLED_BIT;
+        swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         swapchain_info.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
         swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         swapchain_info.compositeAlpha  = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        swapchain_info.minImageCount = 3;
+        swapchain_info.minImageCount = vk_swapchain_min_image_count;
         swapchain_info.imageArrayLayers = 1;
         swapchain_info.surface = vk_surface;
         swapchain_info.imageExtent = surface_capabilities.currentExtent;
@@ -354,6 +355,11 @@ int main(i32 argc, char** argv)
         vr = vkCreateSwapchainKHR(vk_device, &swapchain_info, nullptr, &vk_swapchain);
         CHECK_RESULT(vr);
     };
+
+    //  Retrieve images from swapchain
+    std::vector<VkImage> swapchain_images = {};
+    vr = COUNT_APPEND_HELPER(swapchain_images, vkGetSwapchainImagesKHR, vk_device, vk_swapchain);
+    CHECK_RESULT(vr);
 
     //
     // VULKAN PIPELINE INIT
@@ -397,6 +403,15 @@ int main(i32 argc, char** argv)
         vr = vkAllocateCommandBuffers(vk_device, &info, &cmd_buf);
         CHECK_RESULT(vr);
     }
+
+    //  Command buffer begin recording config
+    VkCommandBufferBeginInfo cmd_buf_begin_info = {};
+    cmd_buf_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_buf_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    
+    //  Begin recording to command buffer
+    vr = vkBeginCommandBuffer(cmd_buf, &cmd_buf_begin_info);
+    CHECK_RESULT(vr);
 
     //
     // MAIN LOOP
