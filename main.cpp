@@ -404,27 +404,27 @@ int main(i32 argc, char** argv)
         CHECK_RESULT(vr);
     }
 
-    //  Command buffer begin recording config
-    VkCommandBufferBeginInfo cmd_buf_begin_info = {};
-    cmd_buf_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_buf_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    
-    //  Begin recording to command buffer
-    vr = vkBeginCommandBuffer(cmd_buf, &cmd_buf_begin_info);
-    CHECK_RESULT(vr);
+    // //  Command buffer begin recording config
+    // VkCommandBufferBeginInfo cmd_buf_begin_info = {};
+    // cmd_buf_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    // cmd_buf_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    //  Frame color
-    VkClearColorValue color = {{1.0, 0.0, 1.0}};
+    // //  Begin recording to command buffer
+    // vr = vkBeginCommandBuffer(cmd_buf, &cmd_buf_begin_info);
+    // CHECK_RESULT(vr);
 
-    //  Image range definition
-    VkImageSubresourceRange image_range = {};
-    image_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_range.baseMipLevel = 0;
-    image_range.levelCount = 1;
-    image_range.baseArrayLayer = 0;
-    image_range.layerCount = 1;
+    // //  Frame color
+    // VkClearColorValue color = {{1.0, 0.0, 1.0}};
 
-    vkCmdClearColorImage(cmd_buf, swapchain_images[0], VK_IMAGE_LAYOUT_GENERAL, &color, 1, &image_range);
+    // //  Image range definition
+    // VkImageSubresourceRange image_range = {};
+    // image_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    // image_range.baseMipLevel = 0;
+    // image_range.levelCount = 1;
+    // image_range.baseArrayLayer = 0;
+    // image_range.layerCount = 1;
+
+    // vkCmdClearColorImage(cmd_buf, swapchain_images[0], VK_IMAGE_LAYOUT_GENERAL, &color, 1, &image_range);
 
     //
     // MAIN LOOP
