@@ -35,6 +35,19 @@ typedef double f64;
 // simple macro to safely and easily compare command-line arguments
 #define STREQ(STR, EXPR) (strncmp((STR), (EXPR), sizeof(STR)/sizeof(*(STR))) == 0)
 
+struct Queue_Family_Details {
+    u32                     index;
+    VkQueueFamilyProperties props;
+};
+
+struct Physical_Device_Detials {
+    VkPhysicalDevice           handle;
+    VkPhysicalDeviceProperties props;
+    std::vector<Queue_Family_Details> queue_families;
+};
+
+std::vector<Physical_Device_Detials> get_suitable_physical_devices_and_queue_families(VkInstance &vk_instance, VkSurfaceKHR &vk_surface, bool log_devices = false);
+
 // program arguments
 bool main_list_supporeted_extensions = false;
 bool main_list_physical_devices_info = false;
@@ -201,85 +214,15 @@ int main(i32 argc, char** argv)
         u32                     target_physical_device_index = 0;
         VkQueueFamilyProperties target_queue_family_properties = {};
 
-        std::vector<VkPhysicalDevice> physical_devices;
+        std::vector<Physical_Device_Detials> suitable_physical_devices = get_suitable_physical_devices_and_queue_families(vk_instance, vk_surface, main_list_physical_devices_info);
+        if(suitable_physical_devices.size() < 1)
         {
-            // query available hardware
-            vr = COUNT_APPEND_HELPER(physical_devices, vkEnumeratePhysicalDevices, vk_instance);
-            CHECK_RESULT(vr);
-
-            std::cout << std::endl << "Querying [" << physical_devices.size() << "] physical devices:" << std::endl;
-            if(physical_devices.size() < 1)
-            {
-                std::cerr << "No physical devices found" << std::endl;
-                std::exit(-1);
-            };
-
-            // check hardware capabilities
-            std::vector<VkQueueFamilyProperties> queue_families;
-            for (u32 physical_device_index = 0; physical_device_index < physical_devices.size(); physical_device_index++)
-            {
-                // get device
-                VkPhysicalDeviceProperties properties = {};
-                vkGetPhysicalDeviceProperties(physical_devices[physical_device_index], &properties);
-
-                // check device queue families
-                queue_families.clear();
-                COUNT_APPEND_HELPER(queue_families, vkGetPhysicalDeviceQueueFamilyProperties, physical_devices[physical_device_index]);
-
-                // save target queue family properties
-                // TODO: implement sanity checking and target selection
-                if (physical_device_index == target_physical_device_index)
-                {
-                    target_queue_family_properties = queue_families[vk_queue_family_index];
-                }
-
-                // log the device name
-                std::cout << properties.deviceName << std::endl;
-                if (main_list_physical_devices_info)
-                {
-                    // log device type
-                    std::cout << "device type: ";
-                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER)          std::cout << "OTHER";
-                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)   std::cout << "DISCRETE_GPU";
-                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) std::cout << "INTEGRATED_GPU";
-                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU)            std::cout << "CPU";
-                    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)    std::cout << "VIRTUAL_GPU";
-                    std::cout << std::endl;
-
-                    // log physical device queue families
-                    std::cout << "queue families: [" << queue_families.size() << "]" << std::endl;
-                    for (u32 queue_family_index = 0; queue_family_index < queue_families.size(); queue_family_index++)
-                    {
-                        VkQueueFamilyProperties family = queue_families[queue_family_index];
-
-                        // log family index and count
-                        std::cout << "family " << queue_family_index << ":\tcount:\t" << family.queueCount << "\tflags: | ";
-                        // log queue family flags
-                        std::cout << (family.queueFlags & VK_QUEUE_GRAPHICS_BIT         ? "GRAPHICS | "       : "         | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_COMPUTE_BIT          ? "COMPUTE | "        : "        | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_TRANSFER_BIT         ? "TRANSFER | "       : "         | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT   ? "SPARSE_BINDING | " : "               | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "DECODE | "         : "       | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "ENCODE | "         : "       | ");
-                        std::cout << (family.queueFlags & VK_QUEUE_PROTECTED_BIT        ? "PROTECTED | "      : "          | ");
-                        // log image transfer granularity
-                        std::cout << " transfer granularity: (" << family.minImageTransferGranularity.width << ", " << family.minImageTransferGranularity.height << ", " << family.minImageTransferGranularity.depth << ")";
-                        std::cout << std::endl;
-                    }
-                    std::cout << std::endl;
-                }
-            }
-        }
-        // Select physical device / GPU hardware
-        vk_physical_device = physical_devices[target_physical_device_index];
-        // sanity check queue family properties to ensure capabilities
-        if (
-            !(target_queue_family_properties.queueFlags & VK_QUEUE_GRAPHICS_BIT) ||
-            !(target_queue_family_properties.queueFlags & VK_QUEUE_TRANSFER_BIT)
-        ) {
-            std::cerr << "Target queue family does not support graphics and transfer" << std::endl;
-            return -1;
-        }
+            std::cerr << "No suitable physical devices found" << std::endl;
+            std::exit(-1);
+        };
+        // TODO: smarter selection of
+        vk_physical_device    = suitable_physical_devices[0].handle;
+        vk_queue_family_index = suitable_physical_devices[0].queue_families[0].index;
 
         // Configure queue
         // this demo will only require a single queue with graphics and transfer capabilities
@@ -331,15 +274,6 @@ int main(i32 argc, char** argv)
     const u32 vk_swapchain_min_image_count = 3;
     VkSwapchainKHR vk_swapchain = {};
     {
-        VkBool32 surface_present_support = {};
-        vr = vkGetPhysicalDeviceSurfaceSupportKHR(vk_physical_device, vk_queue_family_index, vk_surface, &surface_present_support);
-        CHECK_RESULT(vr);
-        if (!surface_present_support)
-        {
-            std::cerr << "Device surface does not support swapchain presentation on selected queue family" << std::endl;
-            return -1;
-        }
-
         //  Query available hardware extensions and surface properties
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_capabilities);
@@ -478,3 +412,145 @@ int main(i32 argc, char** argv)
 
     return 0;
 };
+
+// DEVICE QUEURYING AND SUITABILITY CHECKING
+
+bool check_queue_family_suitability(VkSurfaceKHR &vk_surface, VkPhysicalDevice &physical_device, Queue_Family_Details &queue_family)
+{
+    VkBool32 surface_support = true;
+    vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family.index, vk_surface, &surface_support);
+    if (!surface_support) return false;
+
+    // check support for graphics and transfer commands
+    if (!(queue_family.props.queueFlags & VK_QUEUE_GRAPHICS_BIT)) return false;
+    if (!(queue_family.props.queueFlags & VK_QUEUE_TRANSFER_BIT)) return false;
+
+    return true;
+}
+
+bool check_physical_device_suitability(VkSurfaceKHR &vk_surface, Physical_Device_Detials &physical_device)
+{
+    VkResult vr =  VK_SUCCESS;
+
+    if (physical_device.queue_families.size() < 1) return false;
+
+    bool present_fifo_support = false;
+    std::vector<VkPresentModeKHR> present_modes;
+    vr = COUNT_APPEND_HELPER(present_modes, vkGetPhysicalDeviceSurfacePresentModesKHR, physical_device.handle, vk_surface);
+    CHECK_RESULT(vr);
+    for (auto &present_mode : present_modes) if (present_mode == VK_PRESENT_MODE_FIFO_KHR) { present_fifo_support = true; break; }
+    if (!present_fifo_support) return false;
+
+    return true;
+}
+
+void log_physical_device_props(VkPhysicalDeviceProperties &props) {
+    // log name
+    std::cout << props.deviceName << std::endl;
+
+    // log device type
+    std::cout << "device type: ";
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER)          std::cout << "OTHER";
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)   std::cout << "DISCRETE_GPU";
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) std::cout << "INTEGRATED_GPU";
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU)            std::cout << "CPU";
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)    std::cout << "VIRTUAL_GPU";
+    std::cout << std::endl;
+}
+
+void log_queue_family_props(VkQueueFamilyProperties &props, u32 index) {
+    // log family index and count
+    std::cout << "family " << index << ":\tcount:\t" << props.queueCount << "\tflags: | ";
+
+    // log queue family flags
+    std::cout << (props.queueFlags & VK_QUEUE_GRAPHICS_BIT         ? "GRAPHICS | "       : "         | ");
+    std::cout << (props.queueFlags & VK_QUEUE_COMPUTE_BIT          ? "COMPUTE | "        : "        | ");
+    std::cout << (props.queueFlags & VK_QUEUE_TRANSFER_BIT         ? "TRANSFER | "       : "         | ");
+    std::cout << (props.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT   ? "SPARSE_BINDING | " : "               | ");
+    std::cout << (props.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "DECODE | "         : "       | ");
+    std::cout << (props.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "ENCODE | "         : "       | ");
+    std::cout << (props.queueFlags & VK_QUEUE_PROTECTED_BIT        ? "PROTECTED | "      : "          | ");
+
+    // log image transfer granularity
+    std::cout << " transfer granularity: (" << props.minImageTransferGranularity.width << ", " << props.minImageTransferGranularity.height << ", " << props.minImageTransferGranularity.depth << ")";
+    std::cout << std::endl;
+}
+
+std::vector<Physical_Device_Detials> get_suitable_physical_devices_and_queue_families(VkInstance &vk_instance, VkSurfaceKHR &vk_surface, bool log)
+{
+    VkResult vr = VK_SUCCESS;
+
+    std::vector<Physical_Device_Detials> physical_devices = {};
+
+    // get device handles from the instance
+    std::vector<VkPhysicalDevice> physical_device_handles;
+    vr = COUNT_APPEND_HELPER(physical_device_handles, vkEnumeratePhysicalDevices, vk_instance);
+    CHECK_RESULT(vr);
+
+    if (log)
+    {
+        std::cout << std::endl << "Querying [" << physical_device_handles.size() << "] physical devices:" << std::endl;
+    }
+
+    // populate physical devices
+    for (auto& handle : physical_device_handles)
+    {
+        Physical_Device_Detials physical_device = {};
+        physical_device.handle = handle;
+
+        // get properties
+        vkGetPhysicalDeviceProperties(handle, &physical_device.props);
+
+        // get queue families
+        std::vector<VkQueueFamilyProperties> queue_family_props;
+        COUNT_APPEND_HELPER(queue_family_props, vkGetPhysicalDeviceQueueFamilyProperties, handle);
+
+        if (log)
+        {
+            log_physical_device_props(physical_device.props);
+            std::cout << "queue families: [" << queue_family_props.size() << "]" << std::endl;
+        }
+
+        for (u32 index = 0; index < queue_family_props.size(); index++)
+        {
+            Queue_Family_Details queue_family = {};
+            queue_family.index = index;
+            queue_family.props = queue_family_props[index];
+
+            if (log)
+            {
+                log_queue_family_props(queue_family_props[index], index);
+            }
+
+            if (check_queue_family_suitability(vk_surface, handle, queue_family))
+            {
+                physical_device.queue_families.push_back(queue_family);
+            }
+        }
+
+        if (log) std::cout << std::endl;
+
+        if (check_physical_device_suitability(vk_surface, physical_device))
+        {
+            physical_devices.push_back(physical_device);
+        }
+    }
+
+    // log list of suitable devices and queues
+    if (log)
+    {
+        std::cout << "Suitable devices and queue families:" << std::endl;
+        for (auto& device : physical_devices)
+        {
+            std::cout << device.props.deviceName << ": ";
+            for (auto& queue_family : device.queue_families)
+            {
+                std::cout << queue_family.index << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+    return physical_devices;
+}
