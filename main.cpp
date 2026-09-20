@@ -204,8 +204,7 @@ int main()
                      * COMPUTE - for dispatching commands to the GPU to be executed off-screen
                      */
                     const auto &family_properties = queue_family_properties[j];
-                    if( (family_properties.queueFlags & vk::QueueFlagBits::eGraphics) 
-                    // && (family_properties.queueFlags & vk::QueueFlagBits::eTransfer))
+                    if(family_properties.queueFlags & vk::QueueFlagBits::eGraphics)
                     {
                         std::cout << "Device has appropriate graphics queue flags: " << &family_properties.queueFlags << std::endl;
 
