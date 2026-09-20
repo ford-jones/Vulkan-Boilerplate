@@ -108,10 +108,9 @@ int main()
     
     //  Initialise GLFW and the vulkan loader using the process ID of the vulkan instance that was just created
     glfwInitVulkanLoader(vkGetInstanceProcAddr);
-    glfwInit();
 
     //  Check if the current version of glfw supports vulkan at all
-    if(!glfwVulkanSupported())
+    if(!glfwInit() || !glfwVulkanSupported())
     {
         const char *error = "";
         glfwGetError(&error);
@@ -123,9 +122,9 @@ int main()
     //  Create the application window
     //  Explicitly instruct glfw NOT to create a window that is bound to an OpenGL context, as it does by default
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow *window = glfwCreateWindow(800, 600, "Vulkan Demo", NULL, NULL);
+    GLFWwindow *glfw_window = glfwCreateWindow(800, 600, "Vulkan Demo", NULL, NULL);
     glfwSetWindowCloseCallback(
-        window, 
+        glfw_window, 
         [](GLFWwindow *win) {
             glfwSetWindowShouldClose(win, GLFW_TRUE);
             return;
@@ -134,7 +133,7 @@ int main()
 
     //  Surface creation
     vk::SurfaceKHR vk_surface = {};
-    VkResult surface_creation = glfwCreateWindowSurface(vk_instance, window, NULL, (VkSurfaceKHR *)(&vk_surface));
+    VkResult surface_creation = glfwCreateWindowSurface(vk_instance, glfw_window, NULL, (VkSurfaceKHR *)(&vk_surface));
     if(surface_creation != VK_SUCCESS)
     {
         printf("VULKAN ERROR %d: %s(%d)\n", surface_creation, __FILE__, __LINE__);
@@ -601,8 +600,8 @@ int main()
      */
     
     //  Open window / start rendering
-    glfwSetWindowShouldClose(window, GLFW_FALSE);
-    while(!glfwWindowShouldClose(window))
+    glfwSetWindowShouldClose(glfw_window, GLFW_FALSE);
+    while(!glfwWindowShouldClose(glfw_window))
     {
         //  Ensure previous frame has finished before starting this frame by awaiting the fence
         //  THIS BLOCKS EXECUTION ON THE HOST
@@ -703,6 +702,18 @@ int main()
             printf("VULKAN ERROR %d: %s(%d)\n", surface_creation, __FILE__, __LINE__);
             std::exit(0);
         }
+
+        glfwPollEvents();
     }
+
+    //  Allow all operations to finsh before exiting
+    vk_logical_device.waitIdle();
+
+    /**
+     * TODO:
+     * Cleanup resources
+     */
+    glfwDestroyWindow(glfw_window);
+
     return 1;
 }
