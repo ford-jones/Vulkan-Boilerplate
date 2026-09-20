@@ -9,6 +9,10 @@
 
 int main()
 {
+    /**
+     * INSTANCE CONFIG
+     */
+
     //  Application definition
     vk::ApplicationInfo vk_app_info = {};
     vk_app_info.pApplicationName = "Vulkan Demo";
@@ -97,12 +101,16 @@ int main()
         printf("VULKAN ERROR %d: %s(%d)\n", e.what(), __FILE__, __LINE__);
         std::exit(0);
     }
+
+    /**
+     * WINDOW SETUP
+     */
     
-    //  Initialise GLFW and the vulkan loader 
+    //  Initialise GLFW and the vulkan loader using the process ID of the vulkan instance that was just created
     glfwInitVulkanLoader(vkGetInstanceProcAddr);
     glfwInit();
 
-    //  Check if current glfw version supports vulkan
+    //  Check if the current version of glfw supports vulkan at all
     if(!glfwVulkanSupported())
     {
         const char *error = "";
@@ -112,7 +120,8 @@ int main()
         std::exit(0);
     }
 
-    //  Create + configure window
+    //  Create the application window
+    //  Explicitly instruct glfw NOT to create a window that is bound to an OpenGL context, as it does by default
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow *window = glfwCreateWindow(800, 600, "Vulkan Demo", NULL, NULL);
     glfwSetWindowCloseCallback(
@@ -124,7 +133,6 @@ int main()
     );
 
     //  Surface creation
-    // VkSurfaceKHR vk_surface = {};
     vk::SurfaceKHR vk_surface = {};
     VkResult surface_creation = glfwCreateWindowSurface(vk_instance, window, NULL, (VkSurfaceKHR *)(&vk_surface));
     if(surface_creation != VK_SUCCESS)
@@ -133,6 +141,10 @@ int main()
         std::exit(surface_creation);
     }
 
+    /**
+     * DEVICE SELECTION
+     */
+
     // Query available physical hardware devices
     std::cout << "\n" << "Physical Devices:" << "\n" << std::endl;
     bool vk_appropriate_device_found = false;
@@ -140,7 +152,8 @@ int main()
     uint32_t vk_physical_device_index = 0;
     auto available_physical_devices = vk_instance.enumeratePhysicalDevices();
 
-    //  Inspect the properties of hardware devices
+    //  Inspect the properties of the hardware that has been discovered
+    //  Find a device that is suitable for rendering graphics
     for(size_t i = 0; i < available_physical_devices.size(); i++)
     {
         vk::PhysicalDevice &physical_device_handle = available_physical_devices[i];
@@ -151,37 +164,53 @@ int main()
 
         vk::PhysicalDeviceFeatures physical_device_features = physical_device_handle.getFeatures();
 
-        //  Determine whether the device has rendering capabilities 
-        //  (NOTE: others like VIRTUAL_GPU or even CPU are appropriate, but not here)
+        //  Determine whether the device has rendering capabilities
+        /**
+         * NOTE:
+         * Geometry shaders won't be used and are ideally avoided.
+         * Despite that; they're checked here because their presence is indicitive of a device that supports graphics
+         * 
+         * There are others that could be used e.g. VIRTUAL_GPU or even CPU, but won't be using em
+         */
         if( physical_device_features.geometryShader &&
             physical_device_properties.apiVersion >= VK_API_VERSION_1_4                     &&
             (physical_device_properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu ||
             physical_device_properties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu))
             {
             std::cout << "Rendering hardware found" << std::endl;
-            //  Determine whether the device has the appropriate command-queue functionality 
-            //  Should have surface support
-            //  Should have atleast GRAPHICS and TRANSFER bits
-            //  Should have FIFO presentation mode
+            //  Determine whether the device has the appropriate functionality for a command-queue
+            /**
+             * NOTE:
+             * Should have surface support
+             * Should have atleast GRAPHICS and optionally TRANSFER or COMPUTE bits
+             * Should have a FIFO presentation mode
+             */
             std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device_handle.getQueueFamilyProperties();
             for(size_t j = 0; j < queue_family_properties.size(); j++)
             {
-                //  Determine physical devices's surface capabilities
+                //  Determine whether the device has surface capabilities
                 vk::Bool32 surface_support = physical_device_handle.getSurfaceSupportKHR(j, vk_surface);
                 if(surface_support)
                 {
                     std::cout << "Device has surface support:" << std::endl;
                     
-                    //  Determine queue capabilities
+                    //  Determine whether the device has queue capabilities
                     //  Note: Could also check for eCompute for compute pipelines etc
+                    /**
+                     * NOTE:
+                     * Could also check for eCompute for compute pipelines but dont plan to currently use em
+                     * Two other useful queue families that are commonly used in renderers:
+                     * TRANSFER - used to move data back and fourth between the GPU and the host
+                     * COMPUTE - for dispatching commands to the GPU to be executed off-screen
+                     */
                     const auto &family_properties = queue_family_properties[j];
-                    if( (family_properties.queueFlags & vk::QueueFlagBits::eGraphics) &&
-                        (family_properties.queueFlags & vk::QueueFlagBits::eTransfer))
+                    if( (family_properties.queueFlags & vk::QueueFlagBits::eGraphics) 
+                    // && (family_properties.queueFlags & vk::QueueFlagBits::eTransfer))
                     {
-                        std::cout << "Device has appropriate graphics and transfer queue flags: " << &family_properties.queueFlags << std::endl;
+                        std::cout << "Device has appropriate graphics queue flags: " << &family_properties.queueFlags << std::endl;
 
                         //  Determine presentation capabilities
-                        //  Check for the availability of a (first-in-first-out) queue (w/r/t the swapchain images, not the vkCommands which are asynchronously executed on the gpu)
+                        //  Check for the availability of a (first-in-first-out) queue (w/r/t the treatment of swapchain images, not the treatment vkCommands as they will be executed asynchronously on the GPU)
                         std::vector<vk::PresentModeKHR> present_modes = physical_device_handle.getSurfacePresentModesKHR(vk_surface);
                         for(const auto &present_mode : present_modes)
                             if(present_mode == vk::PresentModeKHR::eFifo)
@@ -205,7 +234,7 @@ int main()
     }
     vk::PhysicalDevice vk_physical_device = available_physical_devices[vk_physical_device_index];
     
-    //  Configure a queue to create on the device that will he used for graphics
+    //  Configure a queue to be created on the device that will he used for graphics rendering operations
     //  An instance can have multiple queues, they're processed in order of pQueuePriorities
     //  1.0 being the highest
     const float queue_priority = 1.0f;
@@ -219,14 +248,21 @@ int main()
 
     vk::PhysicalDeviceFeatures vk_physical_device_features = {};
 
-    //  Structure chain used to expose the vulkan features being used (i.e. vulkan 1_0 - 1_1 - 1_3)
+    //  Create a structure chain used to expose the vulkan features being used (i.e. vulkan 1_0 - 1_1 - 1_3)
+    /**
+     * NOTE:
+     * Just because a 1_3 instance was created doesn't mean there is currently access to all the features
+     * They have to be explicitly specified like so; otherwise the logical device will be created without them
+     * Vulkan provides a SwapChain structure for tidying this up, but I've done it with verbose semantics here
+     * to show more clearly what is going on using pNext
+     */
     vk::PhysicalDeviceVulkan13Features vk_13_features = {};
     vk_13_features.dynamicRendering = vk::True;
     vk::PhysicalDeviceVulkan11Features vk_11_features = {};
     vk_11_features.shaderDrawParameters = vk::True;
     vk_11_features.pNext = &vk_13_features;
 
-    // Configure logical device - is used to interface with physical device
+    // Configure the logical device which will be used to interface with physical device
     vk::Device vk_logical_device = {};
     vk::DeviceCreateInfo logical_device_info = {};
     logical_device_info.queueCreateInfoCount = 1;
@@ -245,18 +281,19 @@ int main()
         std::exit(0);
     }
 
-    //  Retrieve queue handle, only a single queue from the family is created hence index 0
+    /**
+     * TODO: 
+     * Fetching the queue handle could be moved
+     * Querying additional physical device properties should be moved to the rest of physical device creation
+     */
+    //  Retrieve a handle for interfacing with the queue, only a single queue from the family has been created hence index 0
     vk::Queue vk_graphics_queue_handle = vk_logical_device.getQueue(vk_queue_family_index, 0);
     
-    //  Query additional surface capabilities / support for swapchain creation
+    //  Check additional hardware capabilities related to surface management
     vk::SurfaceCapabilitiesKHR surface_capabilities = vk_physical_device.getSurfaceCapabilitiesKHR(vk_surface);
-    std::vector<vk::SurfaceFormatKHR> surface_supported_image_formats = vk_physical_device.getSurfaceFormatsKHR(vk_surface);
+
+    //  Query the hardware's support for different presentation modes
     std::vector<vk::PresentModeKHR> surface_supported_present_modes = vk_physical_device.getSurfacePresentModesKHR(vk_surface);
-    if((surface_supported_image_formats.empty()) || (surface_supported_present_modes.empty()))
-    {
-        printf("VULKAN ERROR Surface failed to meet swapchain criteria: %s(%d)\n", __FILE__, __LINE__);
-        std::exit(0);
-    }
 
     auto fifo_present_mode = std::find_if(
         surface_supported_present_modes.begin(), 
@@ -272,6 +309,9 @@ int main()
         std::exit(0);
     }
 
+    //  Determine the hardware's support for surface formats
+    std::vector<vk::SurfaceFormatKHR> surface_supported_image_formats = vk_physical_device.getSurfaceFormatsKHR(vk_surface);
+
     auto nonlinear_bgra_image_format = std::find_if(
         surface_supported_image_formats.begin(),
         surface_supported_image_formats.end(),
@@ -285,7 +325,9 @@ int main()
         printf("VULKAN ERROR Surface image format failed to meet swapchain criteria: %s(%d)\n", __FILE__, __LINE__);
         std::exit(0);
     }
-    //  Swapchain creation
+
+    //  Create the swapchain used by the device to manage writable image buffers
+    //  Also retrieve the images themselves
     vk::SwapchainCreateInfoKHR swapchain_info = {};
     swapchain_info.surface = vk_surface;
     swapchain_info.minImageCount = surface_capabilities.minImageCount + 1;
@@ -342,8 +384,16 @@ int main()
     /**
      * GRAPHICS PIPELINE INIT
      */
+
+    /**
+     * NOTE:
+     * Unlike OpenGL, compiling the translation units that make up a shader program can be done ahead of time.
+     * This means startup time should be greatly reduced as the compiler doesn't need to be run programatically.
+     * In this demo glsl is still being used but it has been precompiled to SPIRV. This process could be 
+     * done in Cmake. The Vulkan tutorials use Slang with slangc.
+     */
     
-    //  Load vert shader
+    //  Load vertex shader to memory
     std::string vertex_shader_raw = "";
     std::string vertex_shader_filepath = "";
     const char *vertex_shader_filename = "shaders/vert.spv";
@@ -375,7 +425,7 @@ int main()
 
     vk::ShaderModuleCreateInfo vert_shader_info = {};
     vert_shader_info.codeSize = vertex_shader_bytesize;
-    vert_shader_info.pCode = reinterpret_cast<const uint32_t *>(vertex_shader_raw.data());
+    vert_shader_info.pCode = reinterpret_cast<const uint32_t *>(vertex_shader_raw.data());      //  SPIRV is read in 32bit chunks(?), so this needs to be cast from uchar(8)
     vk::ShaderModule vk_vertex_shader = vk_logical_device.createShaderModule(vert_shader_info);
 
     vk::PipelineShaderStageCreateInfo vertex_shader_stage_info = {};
@@ -383,7 +433,7 @@ int main()
     vertex_shader_stage_info.module = vk_vertex_shader;
     vertex_shader_stage_info.pName = "main";
 
-    //  Frag shader
+    //  Load fragment shader to memory
     std::string fragment_shader_raw = "";
     std::string fragment_shader_filepath = "";
     const char *fragment_shader_filename = "shaders/frag.spv";
@@ -425,13 +475,14 @@ int main()
 
     std::vector<vk::PipelineShaderStageCreateInfo> vk_shader_stages = {vertex_shader_stage_info, fragment_shader_stage_info};
 
-    //  Command pool creation
+    //  Create a command pool that will dispatch to the graphics queue and make sure it can be rewritten to 
     vk::CommandPoolCreateInfo command_pool_info = {};
     command_pool_info.queueFamilyIndex = vk_queue_family_index;                                     //  Which queue the commands recorded in this pool should be dispatched to
     command_pool_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;                   //  May be individually (this command pool) rerecorded
     vk::CommandPool vk_command_pool = vk_logical_device.createCommandPool(command_pool_info);
 
-    //  Command buffer creation, used for recording the render pass(es) and dispatching them to the queue
+    //  Allocate the pools command buffers in VRAM
+    //  there will be used for recording the render commands that are going to get pushed to the queue
     vk::CommandBufferAllocateInfo command_buffer_info = {};
     command_buffer_info.level = vk::CommandBufferLevel::ePrimary;
     command_buffer_info.commandPool = vk_command_pool;
@@ -440,18 +491,25 @@ int main()
     vk::CommandBuffer vk_command_buffer = vk_logical_device.allocateCommandBuffers(command_buffer_info)[0];
 
     //  Configure dynamic rendering state
-    //  Dynamic rendering constituents have their configuration ignored during static/fixed rendering state config
-    //  This means that their values must instead be passed in at draw time, meaning the pipeline DOESNT need to be recreated when these values change
-    //  I.e. viewport size (resizing)
+    /**
+     * NOTE:
+     * Dynamic rendering constituents have their configuration ignored during static/fixed rendering state config
+     * This means that their values must instead be passed in at draw time, meaning the pipeline DOESNT need to be recreated when these values change
+     * I.e. viewport size (resizing)
+     */
     std::vector<vk::DynamicState> dynamic_rendering_concerns = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
     vk::PipelineDynamicStateCreateInfo graphics_pipeline_dynamic_state = {};
     graphics_pipeline_dynamic_state.dynamicStateCount = dynamic_rendering_concerns.size();
     graphics_pipeline_dynamic_state.pDynamicStates = dynamic_rendering_concerns.data();
     
-    //  Configure static (fixed-function) rendering state (i.e. the rasterizer itself)
+    //  Configure static (fixed-function) rendering state (i.e. the rasterizer itself / things that aren't going to be respecified every draw)
 
     //  Describe the layout of vertex input data
-    //  similar to glEnableVertexAttribArray + glVertexAttribPointer
+    /**
+     * NOTE:
+     * Just drawing a blue screen, so won't be including any actual vertex attributes
+     * This is similar to glEnableVertexAttribArray + glVertexAttribPointer
+     */
     vk::PipelineVertexInputStateCreateInfo graphics_pipeline_vertex_input_info = {};
     
     //  Describe how vertices should be grouped and assembled.
@@ -459,7 +517,7 @@ int main()
     vk::PipelineInputAssemblyStateCreateInfo graphics_pipeline_vertex_assemble_info = {};
     graphics_pipeline_vertex_assemble_info.topology = vk::PrimitiveTopology::eTriangleList;
 
-    //  Describe the viewport
+    //  Describe the viewport itself
     //  This viewport passes depth-tests which output between 0.0 - 1.0
     vk::Viewport vk_viewport = {};
     vk_viewport.minDepth = 0.0f;            //  Depth-test min
@@ -468,7 +526,7 @@ int main()
     vk_viewport.height = swapchain_info.imageExtent.height;
 
     //  Note that viewport and scissor state were flagged as dynamic
-    //  So their values must be passed in AT DRAW TIME!! (so not here, just define how many to expect)
+    //  So their values must be passed in AT DRAW TIME!! (so not here, just define how many to expect, if it were done here the pipeline would need to be recreated every time the screen resized)
     vk::PipelineViewportStateCreateInfo graphics_pipeline_viewport_info = {};
     graphics_pipeline_viewport_info.viewportCount = 1;        //  There is only 1 viewport, this isn't VR or a flight-sim lol
     graphics_pipeline_viewport_info.scissorCount = 1;         //  scissor for cropping / cutting-out part of the viewport at present-time
@@ -483,7 +541,7 @@ int main()
     
     //  Multisampling (should frag collisions sample the surrounding area for an aggregate result (think MSAA))
     vk::PipelineMultisampleStateCreateInfo graphics_pipeline_multisampling_info = {};
-    graphics_pipeline_multisampling_info.rasterizationSamples = vk::SampleCountFlagBits::e1;
+    graphics_pipeline_multisampling_info.rasterizationSamples = vk::SampleCountFlagBits::e1;    //  1 sample, no anti-aliasing
     graphics_pipeline_multisampling_info.sampleShadingEnable = vk::False;
 
     //  Set the framebuffers blending operation(s) similar to glBlendFunc
@@ -509,7 +567,7 @@ int main()
     graphics_pipeline_rendering_info.colorAttachmentCount = 1;
     graphics_pipeline_rendering_info.pColorAttachmentFormats = &swapchain_info.imageFormat;
     
-    //  Create the graphics pipeline
+    //  Create the graphics pipeline asynchronously on the GPU
     vk::GraphicsPipelineCreateInfo graphics_pipeline_info = {};
     graphics_pipeline_info.layout = vk_graphics_pipeline_layout;
     graphics_pipeline_info.pColorBlendState = &graphics_pipeline_colour_blend_info;
@@ -524,11 +582,11 @@ int main()
     graphics_pipeline_info.renderPass = nullptr;
     graphics_pipeline_info.pNext = &graphics_pipeline_rendering_info;   //  Chain to pipeline rendering structure
 
-    auto vk_graphics_pipeline = vk_logical_device.createGraphicsPipeline(nullptr, graphics_pipeline_info);
+    vk::ResultValue<vk::Pipeline> vk_graphics_pipeline = vk_logical_device.createGraphicsPipeline(nullptr, graphics_pipeline_info);
 
     //  Create binary semaphores (GPU queue delimeter) used for signaling the completion of tasks
     //  Consider a situation where there are two pending queue operations, A and B: 
-    //  A semaphore can be used to instruct that while A is in an 'on' state, B must be 'off'
+    //  Semaphores can be used to instruct that while A is in an 'on' state, B must implicitly be 'off'
     vk::Semaphore vk_rendering_complete_semaphore = vk_logical_device.createSemaphore(vk::SemaphoreCreateInfo());
     vk::Semaphore vk_presenting_complete_semaphore = vk_logical_device.createSemaphore(vk::SemaphoreCreateInfo());
 
@@ -586,8 +644,8 @@ int main()
         bg_color_memory_barrier.subresourceRange.baseArrayLayer = 0;
         bg_color_memory_barrier.subresourceRange.levelCount = 1;
         
-        //  Construct a command which sets the background colour to black
-        //  Note that there is a draw comman here, but that nothing is drawn because graphics_pipeline_vertex_input_info is empty
+        //  Begin drawing to the next frame image, performing rendering via the graphics pipeline
+        //  Note that there is one draw command here, but that nothing is actually drawn because graphics_pipeline_vertex_input_info is empty
         vk::ClearValue bg_colour = vk::ClearColorValue(0.0f, 0.0f, 1.0f, 1.0f);
         vk::RenderingAttachmentInfo rendering_attatchment_info = {};
         rendering_attatchment_info.clearValue = bg_colour;
@@ -606,7 +664,6 @@ int main()
         bg_rendering_info.pColorAttachments = &rendering_attatchment_info;
     
         vk_command_buffer.beginRendering(bg_rendering_info);
-
         vk_command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, vk_graphics_pipeline.value);
         vk_command_buffer.setViewport(0, vk_viewport);
         vk_command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchain_info.imageExtent));
