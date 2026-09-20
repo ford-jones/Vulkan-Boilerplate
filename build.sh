@@ -1,1 +1,0 @@
-clang -std=c++17 main.cpp -lSDL2 -lstdc++ -lvulkan
