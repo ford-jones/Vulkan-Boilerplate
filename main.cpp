@@ -10,7 +10,7 @@
 int main()
 {
     /**
-     * INSTANCE CONFIG
+     * VULKAN INSTANCE CONFIGURATION
      */
 
     //  Application definition
@@ -25,10 +25,19 @@ int main()
     std::vector<vk::LayerProperties> available_layer_properties = vk::enumerateInstanceLayerProperties();
     for(const auto &instance_layer : available_layer_properties)
     {
-        //  Cull out layer versions made for older versions of the spec
-        //  This caused big problems for me on debian which caused device creation
-        //  to segfault. Was the programmatic equivelent to doing VK_LOADER_LAYERS_DISABLE=layername.
-        //  May cause problems later but seemed like the most universal way to solve the issue.
+        /**
+         * TODO:
+         * Make sensible choices about layers.
+         * 
+         * This cut-off is a brutish way of removing weird old layers, specifically because on
+         * debian one named VK_LAYER_INTEL_nullhw caused me much trouble and was the direct 
+         * cause of segmentation faults during device creation. I strongly suspect that this (or worse)
+         * could be the case with numerous other vendor specific layers accross different platforms.
+         * There may be other layers with lower spec versions which are genuinely helpful though 
+         * so this is not a suitable solution.
+         * 
+         * The other solution would be to run the program with VK_LOADER_LAYERS_DISABLE=layername
+         */
         if(instance_layer.specVersion >= VK_API_VERSION_1_2)
         {
             instance_layers.push_back(instance_layer.layerName);
@@ -141,7 +150,7 @@ int main()
     }
 
     /**
-     * DEVICE SELECTION
+     * HARDWARE SELECTION
      */
 
     // Query available physical hardware devices
@@ -231,6 +240,10 @@ int main()
         std::exit(0);
     }
     vk::PhysicalDevice vk_physical_device = available_physical_devices[vk_physical_device_index];
+
+    /**
+     * LOGICAL DEVICE INTERFACE
+     */
     
     //  Configure a queue to be created on the device that will he used for graphics rendering operations
     //  An instance can have multiple queues, they're processed in order of pQueuePriorities
@@ -278,6 +291,10 @@ int main()
         printf("VULKAN ERROR: %s: %s(%d)\n", e.what(), __FILE__, __LINE__);
         std::exit(0);
     }
+
+    /**
+     * GRAPHICS QUEUE, SWAPCHAIN AND IMAGES
+     */
 
     /**
      * TODO: 
@@ -380,7 +397,7 @@ int main()
     }
 
     /**
-     * GRAPHICS PIPELINE INIT
+     * LOADING SHADERS
      */
 
     /**
@@ -470,6 +487,10 @@ int main()
     fragment_shader_stage_info.stage = vk::ShaderStageFlagBits::eFragment;
     fragment_shader_stage_info.module = vk_fragment_shader;
     fragment_shader_stage_info.pName = "main";
+
+    /**
+     * GRAPHICS PIPELINE INITIALISATION
+     */
 
     std::vector<vk::PipelineShaderStageCreateInfo> vk_shader_stages = {vertex_shader_stage_info, fragment_shader_stage_info};
 
@@ -596,7 +617,7 @@ int main()
     vk::Fence vk_draw_fence = vk_logical_device.createFence(drawing_fence_info);
 
     /**
-     * RENDER LOOP
+     * MAIN RENDER LOOP
      */
     
     //  Open window / start rendering
